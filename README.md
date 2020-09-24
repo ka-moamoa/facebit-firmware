@@ -28,7 +28,7 @@ Here we get up and running with the base project. This ensures we're all able to
     git clone https://gitlab.com/ka-moamoa/smart-ppe/embedded-firmware.git
     ```
 
-2. Shift terminal focus to the BLE Button directory:
+2. Shift terminal focus to the `embedded-firmware` directory:
 
     ```bash
     cd embedded-firmware/
