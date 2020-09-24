@@ -68,7 +68,7 @@ Here we get up and running with the base project. This ensures we're all able to
     }
     ```
 
-3. Now you can build right in vscode. You can kick it off by pressing `F1` then `Tasks: Run Build Task`, or you can kick it off with a key command (I think the default it cmd-shift-B on mac and ctrl-shift-b on windows, but you can change this). Key commands are the way to go.
+3. Now you can build right in vscode. You can kick it off by pressing `F1` then `Tasks: Run Build Task`, or you can kick it off with a key command (I think the default is cmd-shift-B on mac and ctrl-shift-b on windows, but you can change this). Key commands are the way to go IMHO.
 
 ## Flashing The Board
 
