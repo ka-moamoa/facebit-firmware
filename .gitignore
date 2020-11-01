@@ -3,6 +3,9 @@
 # Distribution dir
 dist
 
+# Mbed dir
+mbed-os/
+
 # MANIFEST file
 MANIFEST
 doxygen_objdb_*
