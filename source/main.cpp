@@ -22,6 +22,8 @@
 
 #include "ble/GattServer.h"
 #include "BLEProcess.h"
+#include "mbed.h"
+#include "SWO.h"
 
 using mbed::callback;
 
@@ -387,7 +389,13 @@ private:
     events::EventQueue *_event_queue;
 };
 
+SWO_Channel SWO;
+
 int main() {
+    
+
+    SWO.printf("\r\nHello World from SWO\r\n");
+
     BLE &ble_interface = BLE::Instance();
     events::EventQueue event_queue;
     ClockService demo_service;
