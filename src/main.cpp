@@ -20,7 +20,6 @@
 // #include "FRAM.h"
 #include "SPI.h"
 #include "I2C.h"
-#include "SILABS_RHT.h"
 #include "PinNames.h"
 
 
@@ -60,14 +59,6 @@ DigitalOut i2c_pu(I2C_PULLUP);
 
 I2C i2c(I2C_SDA0, I2C_SCL0);
 SWO_Channel SWO;
-silabs::SILABS_RHT rhtSensor(&i2c);
-
-volatile bool busChecked = false;
-
-void cb(void)
-{
-    busChecked = true;
-}
 
 int main()
 {
