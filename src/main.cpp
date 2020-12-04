@@ -21,6 +21,7 @@
 #include "SPI.h"
 #include "I2C.h"
 #include "PinNames.h"
+#include "Si7051.h"
 
 
 DigitalOut led(LED1);
@@ -58,6 +59,7 @@ DigitalOut imu_cs(N_IMU_CS);
 DigitalOut i2c_pu(I2C_PULLUP);
 
 I2C i2c(I2C_SDA0, I2C_SCL0);
+Si7051 sensor(&i2c);
 SWO_Channel SWO;
 
 int main()
@@ -67,11 +69,17 @@ int main()
 
     i2c_pu = 1;
 
+    ThisThread::sleep_for(50ms);
+
+    sensor.reset();
+    ThisThread::sleep_for(20ms);
+
+    sensor.initialize();
     while(1)
     {
         led = !led;
-        char cmd[1]= { 0xAA };
-        i2c.write(0x01, cmd, 1);
+        float temp = sensor.readTemperature();
+        LOG_DEBUG("temperature is: %i", temp * 100);
         ThisThread::sleep_for(1s);
     }
     
