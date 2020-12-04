@@ -70,7 +70,7 @@ int main()
     while(1)
     {
         led = !led;
-        char cmd[1]={0xAA};
+        char cmd[1]= { 0xAA };
         i2c.write(0x01, cmd, 1);
         ThisThread::sleep_for(1s);
     }
