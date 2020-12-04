@@ -62,27 +62,14 @@ SWO_Channel SWO;
 
 int main()
 {
-    fram_vcc = 1;
-    bar_vcc = 1;
-    mag_vcc = 1;
-    imu_vcc = 1;
+    temp_vcc = 1;
+    voc_vcc = 1;
 
-    fram_cs = 1;
-    bar_cs = 1;
-    mag_cs = 1;
-    imu_cs = 1;
+    i2c_pu = 1;
 
-    SPI spi(SPI_MOSI, SPI_MISO, SPI_SCK);
-    spi.format(8, 0);
-    spi.frequency(1000000);
-
-    while (1)
+    while(1)
     {
-        fram_cs = 0;
-        spi.write(0x05);
-        int ret = spi.write(0xFF);
-        LOG_DEBUG("spi response = 0x%X", ret)
-        fram_cs = 1;
+        led = !led;
         ThisThread::sleep_for(1s);
     }
     
