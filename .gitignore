@@ -109,3 +109,4 @@ ST_INTERFACES/*
 
 # Ozone
 *.jdebug.user
+*.jdebug
