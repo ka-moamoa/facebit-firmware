@@ -21,7 +21,10 @@
 #include "SPI.h"
 #include "I2C.h"
 #include "PinNames.h"
+#include "LPS22HBSensor.h"
 
+#define BLINKING_RATE_MS 1000
+#define SPI_TYPE_LPS22HB LPS22HBSensor::SPI4W
 
 DigitalOut led(LED1);
 
@@ -33,8 +36,6 @@ DigitalOut fram_cs(N_MEM_CS);
 DigitalOut fram_vcc(MEM_VCC);
 
 DigitalOut bar_vcc(BAR_VCC);
-DigitalOut bar_cs(BAR_CS);
-DigitalIn bar_drdy(BAR_DRDY);
 
 DigitalOut mic_vcc(MIC_VCC);
 DigitalOut i2s_sd(SD);
@@ -60,15 +61,23 @@ DigitalOut i2c_pu(I2C_PULLUP);
 I2C i2c(I2C_SDA0, I2C_SCL0);
 SWO_Channel SWO;
 
+bool fifoFull = false;
+
+void fifo_full()
+{
+    fifoFull = true;
+}
+
 int main()
 {
+    NRF_GPIO->PIN_CNF[IMU_VCC] |= (GPIO_PIN_CNF_DRIVE_S0H1 << GPIO_PIN_CNF_DRIVE_Pos); // set to high drive mode
+
     fram_vcc = 1;
     bar_vcc = 1;
     mag_vcc = 1;
     imu_vcc = 1;
 
     fram_cs = 1;
-    bar_cs = 1;
     mag_cs = 1;
     imu_cs = 1;
 
@@ -76,16 +85,29 @@ int main()
     spi.format(8, 0);
     spi.frequency(1000000);
 
-    while (1)
-    {
-        fram_cs = 0;
-        spi.write(0x05);
-        int ret = spi.write(0xFF);
-        LOG_DEBUG("spi response = 0x%X", ret)
-        fram_cs = 1;
-        ThisThread::sleep_for(1s);
-    }
-    
-    return 0;
-}
+    LPS22HBSensor tempPressSensor(&spi, BAR_CS);
 
+    tempPressSensor.reset();
+    ThisThread::sleep_for(100ms);
+    tempPressSensor.sw_reset();
+    ThisThread::sleep_for(100ms);
+    tempPressSensor.init(NULL);
+    ThisThread::sleep_for(100ms);
+
+    tempPressSensor.enable();
+
+    while (true)
+    {
+        led = !led;
+
+        float temp = 0;
+        tempPressSensor.get_temperature(&temp);
+        LOG_DEBUG("temp = %.2f deg c", temp);
+
+        float pressure = 0;
+        tempPressSensor.get_pressure(&pressure);
+        LOG_DEBUG("pressure = %.2f", pressure);
+
+        ThisThread::sleep_for(100ms);
+    }
+}
