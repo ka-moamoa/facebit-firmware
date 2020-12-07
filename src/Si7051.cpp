@@ -58,15 +58,25 @@ void Si7051::reset()
 
 uint8_t Si7051::readFirmwareVersion()
 {
-	// bool ack = _i2c->beginTransmission(_address | WRITE); // write command
+	_i2c->start();
+
+	bool ack = _i2c->write(_address | WRITE); // write command
+	if (!ack) { LOG_WARNING("%s", "nack fw address stage") };
 	
-	// _i2c->write(0x84);
-	// _i2c->write(0xB8);
-	// _i2c->endTransmission();
+	ack = _i2c->write(READ_FW_REV[0]);
+	if (!ack) { LOG_WARNING("%s", "nack fw cmd1 stage") };
 
-	// _i2c->requestFrom(_address, (uint8_t)1);
+	ack = _i2c->write(READ_FW_REV[1]);
+	if (!ack) { LOG_WARNING("%s", "nack fw cmd2 stage") };
 
-	// return _i2c->read();
+	_i2c->start();
+	_i2c->write(_address | READ);
+
+	uint8_t fw_rev = _i2c->read(false);
+
+	_i2c->stop();
+
+	return fw_rev;
 }
 
 void Si7051::setResolution(uint8_t resolution)
@@ -90,6 +100,7 @@ void Si7051::setResolution(uint8_t resolution)
 	}
 	
 	_i2c->start();
+
 	bool ack = _i2c->write(_address | WRITE);
 	if (!ack) { LOG_WARNING("%s", "nack set res address stage") };
 
@@ -97,7 +108,7 @@ void Si7051::setResolution(uint8_t resolution)
 	if (!ack) { LOG_WARNING("%s", "nack set res cmd stage") };
 
 	ack = _i2c->write(reg.rawData);
-	if (!ack) { LOG_WARNING("%s", "nack set res write stage") };
+	_i2c->read(true); // this is to "ack" the write
 
 	_i2c->stop();
 }
@@ -105,6 +116,7 @@ void Si7051::setResolution(uint8_t resolution)
 float Si7051::readTemperature() 
 {
 	_i2c->start();
+
 	bool ack = _i2c->write(_address | WRITE);
 	if (!ack) { LOG_WARNING("%s", "nack address stage") };
 
@@ -114,13 +126,23 @@ float Si7051::readTemperature()
 	LowPowerTimer timeout;
 	timeout.start();
 	ack = false;
-	while (ack == false && timeout.read_ms() < MEASUREMENT_TIMEOUT_MS) // the device will nack read requests until the measurement is ready
+
+	// TODO: this isn't working right now. The device should nack until a measurement is ready, but it seems to ack before it's ready and we're getting erroneous results. 
+	// the workaround is to sleep_for > 4 ms or so (probably 10 is safer), to just give it time to finish the measurement.
+	while (ack == false && std::chrono::duration_cast<std::chrono::milliseconds>(timeout.elapsed_time()).count() < MEASUREMENT_TIMEOUT_MS) // the device will nack read requests until the measurement is ready
 	{
-		ThisThread::sleep_for(1ms);
+		ThisThread::sleep_for(4ms);
 		_i2c->start();
 		ack = _i2c->write(_address | READ);
+		if (!ack) { LOG_DEBUG("nack from temp sensor. waiting... %lli ms", std::chrono::duration_cast<std::chrono::milliseconds>(timeout.elapsed_time()).count()); }
 	}
 	timeout.stop();
+	if (ack == false)
+	{
+		LOG_WARNING("%s", "Temp sensor timeout without response");
+		return -999.999;
+	}
+	
 	
 	uint8_t msb = _i2c->read(true); // ack the byte
 	uint8_t lsb = _i2c->read(false); // don't ack (don't get checksum)

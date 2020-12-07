@@ -106,6 +106,8 @@ features/FEATURE_EXPERIMENTAL_API/FEATURE_PSA/TARGET_TFM/TARGET_IGNORE/
 
 # Other Libraries
 ST_INTERFACES/*
+X_NUCLEO_COMMON/*
 
 # Ozone
 *.jdebug.user
+*.jdebug

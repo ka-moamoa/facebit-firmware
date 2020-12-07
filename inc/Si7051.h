@@ -76,7 +76,7 @@ private:
 	const char WRITE = 0x00;
 	const char READ = 0x01;
 	
-	const uint8_t MEASUREMENT_TIMEOUT_MS = 10; 
+	const uint8_t MEASUREMENT_TIMEOUT_MS = 20; 
 };
 
 #endif

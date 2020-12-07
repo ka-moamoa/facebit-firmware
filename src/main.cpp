@@ -64,6 +64,11 @@ SWO_Channel SWO;
 
 int main()
 {
+    NRF_GPIO->PIN_CNF[TEMP_VCC] |= (GPIO_PIN_CNF_DRIVE_S0H1 << GPIO_PIN_CNF_DRIVE_Pos); // set to high drive mode
+    NRF_GPIO->PIN_CNF[I2C_SDA0] |= (GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos); // set to high drive mode
+    NRF_GPIO->PIN_CNF[I2C_SCL0] |= (GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos); // set to high drive mode
+    NRF_GPIO->PIN_CNF[I2C_PULLUP] |= (GPIO_PIN_CNF_DRIVE_S0H1 << GPIO_PIN_CNF_DRIVE_Pos); // set to high drive mode
+
     temp_vcc = 1;
     voc_vcc = 1;
 
@@ -75,11 +80,16 @@ int main()
     ThisThread::sleep_for(20ms);
 
     sensor.initialize();
+    ThisThread::sleep_for(20ms);
+
     while(1)
     {
         led = !led;
+        // uint8_t fw_ver = sensor.readFirmwareVersion();
+        // LOG_DEBUG("firmware version: 0x%X", fw_ver);
+
         float temp = sensor.readTemperature();
-        LOG_DEBUG("temperature is: %i", temp * 100);
+        LOG_DEBUG("temp = %0.2f", temp);
         ThisThread::sleep_for(1s);
     }
     
