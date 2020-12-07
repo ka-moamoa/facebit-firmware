@@ -22,20 +22,22 @@
 #include "I2C.h"
 #include "PinNames.h"
 #include "LPS22HBSensor.h"
+#include "LSM6DSLSensor.h"
 
 #define BLINKING_RATE_MS 1000
 #define SPI_TYPE_LPS22HB LPS22HBSensor::SPI4W
 
 DigitalOut led(LED1);
 
-DigitalOut mag_cs(N_MAG_CS);
+DigitalOut mag_cs(MAG_CS);
 DigitalIn mag_drdy(MAG_DRDY);
 DigitalOut mag_vcc(MAG_VCC);
 
-DigitalOut fram_cs(N_MEM_CS);
+DigitalOut fram_cs(MEM_CS);
 DigitalOut fram_vcc(MEM_VCC);
 
 DigitalOut bar_vcc(BAR_VCC);
+DigitalOut bar_cs(BAR_CS);
 
 DigitalOut mic_vcc(MIC_VCC);
 DigitalOut i2s_sd(SD);
@@ -54,7 +56,6 @@ DigitalIn n_backup(N_BACKUP);
 
 DigitalOut imu_vcc(IMU_VCC);
 DigitalIn imu_int1(IMU_INT1);
-DigitalOut imu_cs(N_IMU_CS);
 
 DigitalOut i2c_pu(I2C_PULLUP);
 
@@ -71,6 +72,11 @@ void fifo_full()
 int main()
 {
     NRF_GPIO->PIN_CNF[IMU_VCC] |= (GPIO_PIN_CNF_DRIVE_S0H1 << GPIO_PIN_CNF_DRIVE_Pos); // set to high drive mode
+    // NRF_GPIO->PIN_CNF[SPI_MOSI] |= (GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos); // set to high drive mode
+    // NRF_GPIO->PIN_CNF[SPI_MISO] |= (GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos); // set to high drive mode
+    // NRF_GPIO->PIN_CNF[SPI_SCK] |= (GPIO_PIN_CNF_DRIVE_S0H1 << GPIO_PIN_CNF_DRIVE_Pos); // set to high drive mode
+    // NRF_GPIO->PIN_CNF[N_IMU_CS] |= (GPIO_PIN_CNF_DRIVE_S0H1 << GPIO_PIN_CNF_DRIVE_Pos); // set to high drive mode
+    
 
     fram_vcc = 1;
     bar_vcc = 1;
@@ -79,35 +85,33 @@ int main()
 
     fram_cs = 1;
     mag_cs = 1;
-    imu_cs = 1;
+    bar_cs = 1;
 
     SPI spi(SPI_MOSI, SPI_MISO, SPI_SCK);
     spi.format(8, 0);
     spi.frequency(1000000);
 
-    LPS22HBSensor tempPressSensor(&spi, BAR_CS);
-
-    tempPressSensor.reset();
-    ThisThread::sleep_for(100ms);
-    tempPressSensor.sw_reset();
-    ThisThread::sleep_for(100ms);
-    tempPressSensor.init(NULL);
     ThisThread::sleep_for(100ms);
 
-    tempPressSensor.enable();
+    LSM6DSLSensor imu(&spi, IMU_CS);
+    imu.init(NULL);
+    ThisThread::sleep_for(100ms);
+    imu.enable_x();
+
+    ThisThread::sleep_for(100ms);
 
     while (true)
     {
         led = !led;
 
-        float temp = 0;
-        tempPressSensor.get_temperature(&temp);
-        LOG_DEBUG("temp = %.2f deg c", temp);
+        uint8_t id;
+        imu.read_id(&id);
+        LOG_DEBUG("Read ID = 0x%X", id);
 
-        float pressure = 0;
-        tempPressSensor.get_pressure(&pressure);
-        LOG_DEBUG("pressure = %.2f", pressure);
+        int32_t data[3] = { 0 };
+        imu.get_x_axes(data);
+        LOG_DEBUG("imu data: x = %li, y = %li, z = %li", data[0], data[1], data[2]);
 
-        ThisThread::sleep_for(100ms);
+        ThisThread::sleep_for(500ms);
     }
 }
