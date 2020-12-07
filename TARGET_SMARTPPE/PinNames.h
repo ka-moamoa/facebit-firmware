@@ -143,12 +143,12 @@ typedef enum {
     I2C_SCL0 = p25,
 
     // Magnetometer
-    N_MAG_CS = p2,
+    MAG_CS = p2,
     MAG_DRDY = p4,
     MAG_VCC = p7,
     
     // FRAM
-    N_MEM_CS = p13,
+    MEM_CS = p13,
     MEM_VCC = p14,
     
     // Barometer
@@ -179,7 +179,7 @@ typedef enum {
     // IMU
     IMU_VCC = p10,
     IMU_INT1 = p22,
-    N_IMU_CS = p31,
+    IMU_CS = p31,
 
     D0 = p11,
     D1 = p12,
