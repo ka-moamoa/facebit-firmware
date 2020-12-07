@@ -21,8 +21,7 @@
 #include "SPI.h"
 #include "I2C.h"
 #include "PinNames.h"
-#include "LPS22HBSensor.h"
-#include "LSM6DSLSensor.h"
+#include "Si7051.h"
 
 #define BLINKING_RATE_MS 1000
 #define SPI_TYPE_LPS22HB LPS22HBSensor::SPI4W
@@ -60,6 +59,7 @@ DigitalIn imu_int1(IMU_INT1);
 DigitalOut i2c_pu(I2C_PULLUP);
 
 I2C i2c(I2C_SDA0, I2C_SCL0);
+Si7051 sensor(&i2c);
 SWO_Channel SWO;
 
 bool fifoFull = false;
@@ -71,47 +71,32 @@ void fifo_full()
 
 int main()
 {
-    NRF_GPIO->PIN_CNF[IMU_VCC] |= (GPIO_PIN_CNF_DRIVE_S0H1 << GPIO_PIN_CNF_DRIVE_Pos); // set to high drive mode
-    // NRF_GPIO->PIN_CNF[SPI_MOSI] |= (GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos); // set to high drive mode
-    // NRF_GPIO->PIN_CNF[SPI_MISO] |= (GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos); // set to high drive mode
-    // NRF_GPIO->PIN_CNF[SPI_SCK] |= (GPIO_PIN_CNF_DRIVE_S0H1 << GPIO_PIN_CNF_DRIVE_Pos); // set to high drive mode
-    // NRF_GPIO->PIN_CNF[N_IMU_CS] |= (GPIO_PIN_CNF_DRIVE_S0H1 << GPIO_PIN_CNF_DRIVE_Pos); // set to high drive mode
-    
+    NRF_GPIO->PIN_CNF[TEMP_VCC] |= (GPIO_PIN_CNF_DRIVE_S0H1 << GPIO_PIN_CNF_DRIVE_Pos); // set to high drive mode
+    NRF_GPIO->PIN_CNF[I2C_SDA0] |= (GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos); // set to high drive mode
+    NRF_GPIO->PIN_CNF[I2C_SCL0] |= (GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos); // set to high drive mode
+    NRF_GPIO->PIN_CNF[I2C_PULLUP] |= (GPIO_PIN_CNF_DRIVE_S0H1 << GPIO_PIN_CNF_DRIVE_Pos); // set to high drive mode
 
-    fram_vcc = 1;
-    bar_vcc = 1;
-    mag_vcc = 1;
-    imu_vcc = 1;
+    temp_vcc = 1;
+    voc_vcc = 1;
 
-    fram_cs = 1;
-    mag_cs = 1;
-    bar_cs = 1;
+    i2c_pu = 1;
 
-    SPI spi(SPI_MOSI, SPI_MISO, SPI_SCK);
-    spi.format(8, 0);
-    spi.frequency(1000000);
+    ThisThread::sleep_for(50ms);
 
-    ThisThread::sleep_for(100ms);
+    sensor.reset();
+    ThisThread::sleep_for(20ms);
 
-    LSM6DSLSensor imu(&spi, IMU_CS);
-    imu.init(NULL);
-    ThisThread::sleep_for(100ms);
-    imu.enable_x();
+    sensor.initialize();
+    ThisThread::sleep_for(20ms);
 
-    ThisThread::sleep_for(100ms);
-
-    while (true)
+    while(1)
     {
         led = !led;
+        // uint8_t fw_ver = sensor.readFirmwareVersion();
+        // LOG_DEBUG("firmware version: 0x%X", fw_ver);
 
-        uint8_t id;
-        imu.read_id(&id);
-        LOG_DEBUG("Read ID = 0x%X", id);
-
-        int32_t data[3] = { 0 };
-        imu.get_x_axes(data);
-        LOG_DEBUG("imu data: x = %li, y = %li, z = %li", data[0], data[1], data[2]);
-
-        ThisThread::sleep_for(500ms);
+        float temp = sensor.readTemperature();
+        LOG_DEBUG("temp = %0.2f", temp);
+        ThisThread::sleep_for(1s);
     }
 }
