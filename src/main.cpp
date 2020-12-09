@@ -17,11 +17,10 @@
 #include "mbed.h"
 #include "SWO.h"
 #include "logger.h"
-// #include "FRAM.h"
+#include "FRAM.h"
 #include "SPI.h"
 #include "I2C.h"
 #include "PinNames.h"
-
 
 DigitalOut led(LED1);
 
@@ -29,7 +28,6 @@ DigitalOut mag_cs(N_MAG_CS);
 DigitalIn mag_drdy(MAG_DRDY);
 DigitalOut mag_vcc(MAG_VCC);
 
-DigitalOut fram_cs(N_MEM_CS);
 DigitalOut fram_vcc(MEM_VCC);
 
 DigitalOut bar_vcc(BAR_VCC);
@@ -62,12 +60,13 @@ SWO_Channel SWO;
 
 int main()
 {
+    NRF_GPIO->PIN_CNF[IMU_VCC] |= (GPIO_PIN_CNF_DRIVE_S0H1 << GPIO_PIN_CNF_DRIVE_Pos); // set to high drive mode
+
     fram_vcc = 1;
     bar_vcc = 1;
     mag_vcc = 1;
     imu_vcc = 1;
 
-    fram_cs = 1;
     bar_cs = 1;
     mag_cs = 1;
     imu_cs = 1;
@@ -76,16 +75,22 @@ int main()
     spi.format(8, 0);
     spi.frequency(1000000);
 
-    while (1)
-    {
-        fram_cs = 0;
-        spi.write(0x05);
-        int ret = spi.write(0xFF);
-        LOG_DEBUG("spi response = 0x%X", ret)
-        fram_cs = 1;
-        ThisThread::sleep_for(1s);
-    }
-    
+    FRAM fram(&spi, N_MEM_CS);
+
+    char rx_buffer[5] = {0};
+    fram.read_bytes(0x00, rx_buffer, 5);
+    LOG_DEBUG("bytes0  = 0x%X, 0x%X, 0x%X, 0x%X, 0x%X", rx_buffer[0], rx_buffer[1], rx_buffer[2], rx_buffer[3], rx_buffer[4]);
+
+    const char tx[4] = {0xAA, 0xBB, 0xCC, 0xDD};
+    fram.write_bytes(0x01, tx, 4);
+
+    char rx_buffer1[4] = {0};
+    fram.read_bytes(0x01, rx_buffer1, 4);
+    LOG_DEBUG("bytes1 = 0x%X, 0x%X, 0x%X, 0x%X", rx_buffer1[0], rx_buffer1[1], rx_buffer1[2], rx_buffer1[3]);
+
+    char rx_buffer2[5] = {0};
+    fram.read_bytes(0x00, rx_buffer2, 5);
+    LOG_DEBUG("bytes2 = 0x%X, 0x%X, 0x%X, 0x%X, 0x%X", rx_buffer2[0], rx_buffer2[1], rx_buffer2[2], rx_buffer2[3], rx_buffer2[4]);
+
     return 0;
 }
-
