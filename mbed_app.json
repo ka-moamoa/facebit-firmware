@@ -1,7 +1,8 @@
 {
     "target_overrides": {
         "SMARTPPE": {
-            "target.features_add": ["BLE"]
+            "target.features_add": ["BLE"],
+            "target.printf_lib": "std"
         }
     }
 }

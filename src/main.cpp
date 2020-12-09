@@ -21,10 +21,14 @@
 #include "SPI.h"
 #include "I2C.h"
 #include "PinNames.h"
+#include "Si7051.h"
+
+#define BLINKING_RATE_MS 1000
+#define SPI_TYPE_LPS22HB LPS22HBSensor::SPI4W
 
 DigitalOut led(LED1);
 
-DigitalOut mag_cs(N_MAG_CS);
+DigitalOut mag_cs(MAG_CS);
 DigitalIn mag_drdy(MAG_DRDY);
 DigitalOut mag_vcc(MAG_VCC);
 
@@ -32,7 +36,6 @@ DigitalOut fram_vcc(MEM_VCC);
 
 DigitalOut bar_vcc(BAR_VCC);
 DigitalOut bar_cs(BAR_CS);
-DigitalIn bar_drdy(BAR_DRDY);
 
 DigitalOut mic_vcc(MIC_VCC);
 DigitalOut i2s_sd(SD);
@@ -51,12 +54,20 @@ DigitalIn n_backup(N_BACKUP);
 
 DigitalOut imu_vcc(IMU_VCC);
 DigitalIn imu_int1(IMU_INT1);
-DigitalOut imu_cs(N_IMU_CS);
+DigitalOut imu_cs(IMU_CS);
 
 DigitalOut i2c_pu(I2C_PULLUP);
 
 I2C i2c(I2C_SDA0, I2C_SCL0);
+Si7051 sensor(&i2c);
 SWO_Channel SWO;
+
+bool fifoFull = false;
+
+void fifo_full()
+{
+    fifoFull = true;
+}
 
 int main()
 {
@@ -71,11 +82,11 @@ int main()
     mag_cs = 1;
     imu_cs = 1;
 
-    SPI spi(SPI_MOSI, SPI_MISO, SPI_SCK);
-    spi.format(8, 0);
-    spi.frequency(1000000);
+    ThisThread::sleep_for(10ms);
 
-    FRAM fram(&spi, N_MEM_CS);
+    SPI spi(SPI_MOSI, SPI_MISO, SPI_SCK);
+
+    FRAM fram(&spi, MEM_CS);
 
     char rx_buffer[5] = {0};
     fram.read_bytes(0x00, rx_buffer, 5);
