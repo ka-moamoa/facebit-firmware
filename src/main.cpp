@@ -22,6 +22,7 @@
 #include "I2C.h"
 #include "PinNames.h"
 #include "Si7051.h"
+#include "nrf_soc.h"
 
 #define BLINKING_RATE_MS 1000
 #define SPI_TYPE_LPS22HB LPS22HBSensor::SPI4W
@@ -71,6 +72,7 @@ void fifo_full()
 
 int main()
 {
+    NRF_POWER->DCDCEN |= 1;
     NRF_GPIO->PIN_CNF[IMU_VCC] |= (GPIO_PIN_CNF_DRIVE_S0H1 << GPIO_PIN_CNF_DRIVE_Pos); // set to high drive mode
 
     fram_vcc = 1;
@@ -81,27 +83,25 @@ int main()
     bar_cs = 1;
     mag_cs = 1;
     imu_cs = 1;
+    fram_vcc = 1;
 
-    ThisThread::sleep_for(10ms);
+    vcap_en = 0;
 
-    SPI spi(SPI_MOSI, SPI_MISO, SPI_SCK);
+    float cap_voltage = vcap.read();
+    LOG_DEBUG("cap voltage = %0.2f", cap_voltage);
 
-    FRAM fram(&spi, MEM_CS);
+    vcap_en = 1;
+    ThisThread::sleep_for(1ms);
+    cap_voltage = vcap.read();
+    LOG_DEBUG("cap voltage = %0.2f", cap_voltage);
 
-    char rx_buffer[5] = {0};
-    fram.read_bytes(0x00, rx_buffer, 5);
-    LOG_DEBUG("bytes0  = 0x%X, 0x%X, 0x%X, 0x%X, 0x%X", rx_buffer[0], rx_buffer[1], rx_buffer[2], rx_buffer[3], rx_buffer[4]);
-
-    const char tx[4] = {0xAA, 0xBB, 0xCC, 0xDD};
-    fram.write_bytes(0x01, tx, 4);
-
-    char rx_buffer1[4] = {0};
-    fram.read_bytes(0x01, rx_buffer1, 4);
-    LOG_DEBUG("bytes1 = 0x%X, 0x%X, 0x%X, 0x%X", rx_buffer1[0], rx_buffer1[1], rx_buffer1[2], rx_buffer1[3]);
-
-    char rx_buffer2[5] = {0};
-    fram.read_bytes(0x00, rx_buffer2, 5);
-    LOG_DEBUG("bytes2 = 0x%X, 0x%X, 0x%X, 0x%X, 0x%X", rx_buffer2[0], rx_buffer2[1], rx_buffer2[2], rx_buffer2[3], rx_buffer2[4]);
+    while (1)
+    {
+        ThisThread::sleep_for(1ms);
+        cap_voltage = vcap.read();
+        bool on_backup = n_backup.read();
+        LOG_DEBUG("cap voltage = %0.2f, on backup = %i", cap_voltage, !on_backup);
+    }
 
     return 0;
 }
