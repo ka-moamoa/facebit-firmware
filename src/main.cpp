@@ -29,6 +29,7 @@
 #include "Si7051.h"
 #include "LPS22HBSensor.h"
 #include "LSM6DSLSensor.h"
+#include "CapCalc.h"
 
 DigitalOut led(LED1);
 BusControl *bus_control = BusControl::get_instance();
@@ -36,6 +37,8 @@ BusControl *bus_control = BusControl::get_instance();
 SWO_Channel SWO; // for SWO logging
 I2C i2c(I2C_SDA0, I2C_SCL0);
 SPI spi(SPI_MOSI, SPI_MISO, SPI_SCK);
+
+CapCalc cap_monitor(VCAP, VCAP_ENABLE, 3000);
 
 int main()
 {
@@ -59,7 +62,7 @@ int main()
 
         float pressure = 0;
         barometer.get_pressure(&pressure);
-        LOG_DEBUG("pressure = %0.3f", pressure);
+        LOG_DEBUG("pressure = %0.3f mbar", pressure);
 
         int32_t data[3] = { 0 };
         imu.get_x_axes(data);
@@ -78,10 +81,17 @@ int main()
         ThisThread::sleep_for(100ms);
 
         temp.initialize();
+        ThisThread::sleep_for(10ms);
         float temperature = temp.readTemperature();
-        LOG_DEBUG("temperature = %0.3f", temperature);
+        LOG_DEBUG("temperature = %0.3f C", temperature);
 
         bus_control->i2c_power(false);
+
+        float voltage = cap_monitor.read_capacitor_voltage();
+        LOG_DEBUG("capacitor voltage = %0.3f V", voltage);
+
+        float joules = cap_monitor.calc_joules();
+        LOG_DEBUG("energy = %f J", joules);
 
         ThisThread::sleep_for(500ms);
     }
