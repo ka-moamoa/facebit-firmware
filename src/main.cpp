@@ -14,94 +14,85 @@
  * limitations under the License.
  */
 
+
 #include "mbed.h"
-#include "SWO.h"
-#include "logger.h"
-#include "FRAM.h"
+
+#include "PinNames.h"
+
 #include "SPI.h"
 #include "I2C.h"
-#include "PinNames.h"
-#include "Si7051.h"
-#include "nrf_soc.h"
+#include "SWO.h"
+#include "SWOLogger.h"
 
-#define BLINKING_RATE_MS 1000
-#define SPI_TYPE_LPS22HB LPS22HBSensor::SPI4W
+#include "BusControl.h"
+#include "FRAM.h"
+#include "Si7051.h"
+#include "LPS22HBSensor.h"
+#include "LSM6DSLSensor.h"
+#include "CapCalc.h"
 
 DigitalOut led(LED1);
+BusControl *bus_control = BusControl::get_instance();
 
-DigitalOut mag_cs(MAG_CS);
-DigitalIn mag_drdy(MAG_DRDY);
-DigitalOut mag_vcc(MAG_VCC);
-
-DigitalOut fram_vcc(MEM_VCC);
-
-DigitalOut bar_vcc(BAR_VCC);
-DigitalOut bar_cs(BAR_CS);
-
-DigitalOut mic_vcc(MIC_VCC);
-DigitalOut i2s_sd(SD);
-DigitalOut i2s_ws(WS);
-DigitalOut i2s_sck(I2S_SCK);
-
-DigitalOut temp_vcc(TEMP_VCC);
-
-DigitalOut acc_vcc(ACC_VCC_EN);
-
-DigitalOut voc_vcc(VOC_VCC);
-
-AnalogIn vcap(VCAP);
-DigitalOut vcap_en(VCAP_ENABLE);
-DigitalIn n_backup(N_BACKUP);
-
-DigitalOut imu_vcc(IMU_VCC);
-DigitalIn imu_int1(IMU_INT1);
-DigitalOut imu_cs(IMU_CS);
-
-DigitalOut i2c_pu(I2C_PULLUP);
-
+SWO_Channel SWO; // for SWO logging
 I2C i2c(I2C_SDA0, I2C_SCL0);
-Si7051 sensor(&i2c);
-SWO_Channel SWO;
+SPI spi(SPI_MOSI, SPI_MISO, SPI_SCK);
 
-bool fifoFull = false;
-
-void fifo_full()
-{
-    fifoFull = true;
-}
+CapCalc cap_monitor(VCAP, VCAP_ENABLE, 3000);
 
 int main()
 {
-    NRF_POWER->DCDCEN |= 1;
-    NRF_GPIO->PIN_CNF[IMU_VCC] |= (GPIO_PIN_CNF_DRIVE_S0H1 << GPIO_PIN_CNF_DRIVE_Pos); // set to high drive mode
-
-    fram_vcc = 1;
-    bar_vcc = 1;
-    mag_vcc = 1;
-    imu_vcc = 1;
-
-    bar_cs = 1;
-    mag_cs = 1;
-    imu_cs = 1;
-    fram_vcc = 1;
-
-    vcap_en = 0;
-
-    float cap_voltage = vcap.read();
-    LOG_DEBUG("cap voltage = %0.2f", cap_voltage);
-
-    vcap_en = 1;
-    ThisThread::sleep_for(1ms);
-    cap_voltage = vcap.read();
-    LOG_DEBUG("cap voltage = %0.2f", cap_voltage);
-
     while (1)
     {
-        ThisThread::sleep_for(1ms);
-        cap_voltage = vcap.read();
-        bool on_backup = n_backup.read();
-        LOG_DEBUG("cap voltage = %0.2f, on backup = %i", cap_voltage, !on_backup);
-    }
+        bus_control->spi_power(true);
+        ThisThread::sleep_for(10ms);
 
-    return 0;
+        LPS22HBSensor barometer(&spi, BAR_CS);
+        LSM6DSLSensor imu(&spi, IMU_CS);
+        FRAM fram(&spi, FRAM_CS);
+        Si7051 temp(&i2c);
+
+        barometer.init(NULL);
+        barometer.enable();
+
+        imu.init(NULL);
+        imu.enable_x();
+
+        ThisThread::sleep_for(100ms);
+
+        float pressure = 0;
+        barometer.get_pressure(&pressure);
+        LOG_DEBUG("pressure = %0.3f mbar", pressure);
+
+        int32_t data[3] = { 0 };
+        imu.get_x_axes(data);
+        LOG_DEBUG("imu data: x = %li, y = %li, z = %li", data[0], data[1], data[2]);
+
+        const char tx[4] = {0xAA, 0xBB, 0xCC, 0xDD};
+        fram.write_bytes(0x01, tx, 4);
+
+        char rx_buffer[4] = {0};
+        fram.read_bytes(0x01, rx_buffer, 4);
+        LOG_DEBUG("bytes1 = 0x%X, 0x%X, 0x%X, 0x%X", rx_buffer[0], rx_buffer[1], rx_buffer[2], rx_buffer[3]);
+
+        bus_control->spi_power(false);
+
+        bus_control->i2c_power(true);
+        ThisThread::sleep_for(100ms);
+
+        temp.initialize();
+        ThisThread::sleep_for(10ms);
+        float temperature = temp.readTemperature();
+        LOG_DEBUG("temperature = %0.3f C", temperature);
+
+        bus_control->i2c_power(false);
+
+        float voltage = cap_monitor.read_capacitor_voltage();
+        LOG_DEBUG("capacitor voltage = %0.3f V", voltage);
+
+        float joules = cap_monitor.calc_joules();
+        LOG_DEBUG("energy = %f J", joules);
+
+        ThisThread::sleep_for(500ms);
+    }
 }

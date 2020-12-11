@@ -34,6 +34,8 @@ public:
     FRAM(SPI *spi, PinName fram_cs);
     ~FRAM();
 
+    void initialize();
+
     bool write_bytes(uint32_t address, const char *tx_buffer, int tx_bytes);
     uint8_t read_bytes(uint32_t address, char *rx_buffer, int rx_bytes);
 };

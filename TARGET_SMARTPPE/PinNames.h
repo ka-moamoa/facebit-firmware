@@ -148,8 +148,8 @@ typedef enum {
     MAG_VCC = p7,
     
     // FRAM
-    MEM_CS = p13,
-    MEM_VCC = p14,
+    FRAM_CS = p13,
+    FRAM_VCC = p14,
     
     // Barometer
     BAR_VCC = p9,
