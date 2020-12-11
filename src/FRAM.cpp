@@ -1,6 +1,6 @@
 #include "FRAM.h"
 #include "rtos.h"
-#include "logger.h"
+#include "SWOLogger.h"
 
 // https://www.cypress.com/documentation/application-notes/an304-spi-guide-f-ram
 
@@ -13,6 +13,10 @@ _fram_cs(fram_cs)
 }
 
 FRAM::~FRAM()
+{
+}
+
+void FRAM::initialize()
 {
 }
 

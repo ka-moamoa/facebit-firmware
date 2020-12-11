@@ -32,7 +32,7 @@ THE SOFTWARE.
 #include "Si7051.h"
 #include "LowPowerTimer.h"
 #include "I2C.h"
-#include "logger.h"
+#include "SWOLogger.h"
 
 Si7051::Si7051(I2C *i2c, char address)
 {
