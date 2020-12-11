@@ -14,94 +14,75 @@
  * limitations under the License.
  */
 
+
 #include "mbed.h"
-#include "SWO.h"
-#include "logger.h"
-#include "FRAM.h"
+
+#include "PinNames.h"
+
 #include "SPI.h"
 #include "I2C.h"
-#include "PinNames.h"
-#include "Si7051.h"
+#include "SWO.h"
+#include "SWOLogger.h"
 
-#define BLINKING_RATE_MS 1000
-#define SPI_TYPE_LPS22HB LPS22HBSensor::SPI4W
+#include "BusControl.h"
+#include "FRAM.h"
+#include "Si7051.h"
+#include "LPS22HBSensor.h"
+#include "LSM6DSLSensor.h"
 
 DigitalOut led(LED1);
+BusControl *bus_control = BusControl::get_instance();
 
-DigitalOut mag_cs(MAG_CS);
-DigitalIn mag_drdy(MAG_DRDY);
-DigitalOut mag_vcc(MAG_VCC);
-
-DigitalOut fram_vcc(MEM_VCC);
-
-DigitalOut bar_vcc(BAR_VCC);
-DigitalOut bar_cs(BAR_CS);
-
-DigitalOut mic_vcc(MIC_VCC);
-DigitalOut i2s_sd(SD);
-DigitalOut i2s_ws(WS);
-DigitalOut i2s_sck(I2S_SCK);
-
-DigitalOut temp_vcc(TEMP_VCC);
-
-DigitalOut acc_vcc(ACC_VCC_EN);
-
-DigitalOut voc_vcc(VOC_VCC);
-
-AnalogIn vcap(VCAP);
-DigitalOut vcap_en(VCAP_ENABLE);
-DigitalIn n_backup(N_BACKUP);
-
-DigitalOut imu_vcc(IMU_VCC);
-DigitalIn imu_int1(IMU_INT1);
-DigitalOut imu_cs(IMU_CS);
-
-DigitalOut i2c_pu(I2C_PULLUP);
-
+SWO_Channel SWO; // for SWO logging
 I2C i2c(I2C_SDA0, I2C_SCL0);
-Si7051 sensor(&i2c);
-SWO_Channel SWO;
-
-bool fifoFull = false;
-
-void fifo_full()
-{
-    fifoFull = true;
-}
+SPI spi(SPI_MOSI, SPI_MISO, SPI_SCK);
 
 int main()
 {
-    NRF_GPIO->PIN_CNF[IMU_VCC] |= (GPIO_PIN_CNF_DRIVE_S0H1 << GPIO_PIN_CNF_DRIVE_Pos); // set to high drive mode
+    while (1)
+    {
+        bus_control->spi_power(true);
+        ThisThread::sleep_for(10ms);
 
-    fram_vcc = 1;
-    bar_vcc = 1;
-    mag_vcc = 1;
-    imu_vcc = 1;
+        LPS22HBSensor barometer(&spi, BAR_CS);
+        LSM6DSLSensor imu(&spi, IMU_CS);
+        FRAM fram(&spi, FRAM_CS);
+        Si7051 temp(&i2c);
 
-    bar_cs = 1;
-    mag_cs = 1;
-    imu_cs = 1;
+        barometer.init(NULL);
+        barometer.enable();
 
-    ThisThread::sleep_for(10ms);
+        imu.init(NULL);
+        imu.enable_x();
 
-    SPI spi(SPI_MOSI, SPI_MISO, SPI_SCK);
+        ThisThread::sleep_for(100ms);
 
-    FRAM fram(&spi, MEM_CS);
+        float pressure = 0;
+        barometer.get_pressure(&pressure);
+        LOG_DEBUG("pressure = %0.3f", pressure);
 
-    char rx_buffer[5] = {0};
-    fram.read_bytes(0x00, rx_buffer, 5);
-    LOG_DEBUG("bytes0  = 0x%X, 0x%X, 0x%X, 0x%X, 0x%X", rx_buffer[0], rx_buffer[1], rx_buffer[2], rx_buffer[3], rx_buffer[4]);
+        int32_t data[3] = { 0 };
+        imu.get_x_axes(data);
+        LOG_DEBUG("imu data: x = %li, y = %li, z = %li", data[0], data[1], data[2]);
 
-    const char tx[4] = {0xAA, 0xBB, 0xCC, 0xDD};
-    fram.write_bytes(0x01, tx, 4);
+        const char tx[4] = {0xAA, 0xBB, 0xCC, 0xDD};
+        fram.write_bytes(0x01, tx, 4);
 
-    char rx_buffer1[4] = {0};
-    fram.read_bytes(0x01, rx_buffer1, 4);
-    LOG_DEBUG("bytes1 = 0x%X, 0x%X, 0x%X, 0x%X", rx_buffer1[0], rx_buffer1[1], rx_buffer1[2], rx_buffer1[3]);
+        char rx_buffer[4] = {0};
+        fram.read_bytes(0x01, rx_buffer, 4);
+        LOG_DEBUG("bytes1 = 0x%X, 0x%X, 0x%X, 0x%X", rx_buffer[0], rx_buffer[1], rx_buffer[2], rx_buffer[3]);
 
-    char rx_buffer2[5] = {0};
-    fram.read_bytes(0x00, rx_buffer2, 5);
-    LOG_DEBUG("bytes2 = 0x%X, 0x%X, 0x%X, 0x%X, 0x%X", rx_buffer2[0], rx_buffer2[1], rx_buffer2[2], rx_buffer2[3], rx_buffer2[4]);
+        bus_control->spi_power(false);
 
-    return 0;
+        bus_control->i2c_power(true);
+        ThisThread::sleep_for(100ms);
+
+        temp.initialize();
+        float temperature = temp.readTemperature();
+        LOG_DEBUG("temperature = %0.3f", temperature);
+
+        bus_control->i2c_power(false);
+
+        ThisThread::sleep_for(500ms);
+    }
 }
