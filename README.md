@@ -83,7 +83,7 @@ Here we get up and running with the base project. This ensures we're all able to
 
 3. Now you can build right in vscode. You can kick it off by pressing `F1` then `Tasks: Run Build Task`, or you can kick it off with a key command (I think the default is cmd-shift-B on mac and ctrl-shift-b on windows, but you can change this). Key commands are the way to go IMO.
 
-## Flashing and Debuggin The Board with Ozone (Recommended)
+## Flashing and Debugging The Board with Ozone (Recommended)
 
 Unfortunately in my experience the best debugger for Nordic chips (Ozone) is not the same as the best coding environment for Nordic chips (VSCode). That means that I usually code and build in VSCode, and then switch to Ozone when it's time to debug. Thankfully, Ozone makes this process relatively painless. Here's how to set it up:
 
