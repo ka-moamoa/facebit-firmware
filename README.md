@@ -18,6 +18,12 @@
 
     [GNU Toolchain | GNU Arm Embedded Toolchain Downloads - Arm Developer](https://developer.arm.com/tools-and-software/open-source-software/developer-tools/gnu-toolchain/gnu-rm/downloads)
 
+5. Required Hardware:
+    - Smart PPE board
+    - JLINK debugger (e.g. [J-Link EDU Mini](https://www.adafruit.com/product/3571?gclid=EAIaIQobChMIqeXO9fvS7QIVEI3ICh3I5g0TEAQYAiABEgJDwvD_BwE), which we have a lot of in the lab). Note that you can also use a Nordic (or I think even ST) development kit in a pinch, but the dedicated J-Link will be faster.
+    - Micro USB Cable
+    - 7.9mm (W) x 5.4mm (H) Silver Oxide Battery (or dedicated power supply)
+
 ## Mbed Project Setup
 
 Here we get up and running with the base project. This ensures we're all able to build the code, flash, and debug our development kits.
@@ -55,22 +61,57 @@ Here we get up and running with the base project. This ensures we're all able to
         "version": "2.0.0",
         "tasks": [
             {
-                "label": "build",
+                "label": "build-debug",
                 "type": "shell",
-                "command": "mbed compile -t GCC_ARM -m NRF52_DK",
+                "command": "mbed compile -t GCC_ARM -m SMARTPPE --profile mbed-os/tools/profiles/debug.json",
                 "problemMatcher": "$gcc",
                 "group": {
                     "kind": "build",
                     "isDefault": true
                 }
+            },
+            {
+                "label": "build",
+                "type": "shell",
+                "command": "mbed compile -t GCC_ARM -m SMARTPPE",
+                "problemMatcher": "$gcc",
+                "group": "build"
             }
         ]
     }
     ```
 
-3. Now you can build right in vscode. You can kick it off by pressing `F1` then `Tasks: Run Build Task`, or you can kick it off with a key command (I think the default is cmd-shift-B on mac and ctrl-shift-b on windows, but you can change this). Key commands are the way to go IMHO.
+3. Now you can build right in vscode. You can kick it off by pressing `F1` then `Tasks: Run Build Task`, or you can kick it off with a key command (I think the default is cmd-shift-B on mac and ctrl-shift-b on windows, but you can change this). Key commands are the way to go IMO.
 
-## Flashing The Board
+## Flashing and Debuggin The Board with Ozone (Recommended)
+
+Unfortunately in my experience the best debugger for Nordic chips (Ozone) is not the same as the best coding environment for Nordic chips (VSCode). That means that I usually code and build in VSCode, and then switch to Ozone when it's time to debug. Thankfully, Ozone makes this process relatively painless. Here's how to set it up:
+
+1. Plug in the J-Link (or dev kit) to your computer via USB, connect the ribbon cable to the smart ppe board's debug header. The red wire on the ribbon should be on the side of the J-Link marked with a (1). ![](.readme-images/j-link.jpeg)
+2. Download [Ozone](https://www.segger.com/products/development-tools/ozone-j-link-debugger/#download-installation)
+3. Open it up, select `Create New Project`
+4. Use the following Target Device settings: 
+    - Device: `nRF52832_xxAA`
+    - Register Set: `Cortex-M4 (with FPU)`
+    - Peripherals: I placed a file `nrf52.svd` in the repository. Put in your system's pathname to this file. (e.g. `/Users/alex/google-drive/hester-lab/Projects/smart ppe/embedded-firmware/nrf52.svd`)
+5. Hit next, then use these Connection Settings:
+    - Target Interface: `SWD`
+    - Target Interface Speed: `8 MHz`
+    - Host Interface: `USB`
+    - Serial No: (this should auto-populate with your connected j-link device's serial number, leave it as is)
+6. Hit next, and enter your systems's pathname to the .elf file. From the base directory of the repo, the path is: `embedded-firmware/BUILD/SMARTPPE/GCC_ARM-DEBUG/embedded-firmware.elf` Note that this only exists if you have already successfully built the software from VSCode!
+7. Hit Finish, you should see `main.cpp` up on the screen. 
+8. Hit the green power button in the upper left corner of the screen. If your smart PPE board is powered, Ozone should connect and download the program to it. 
+9. One more step before you run the program. In the menu bar, select Tools->Trace Settings. Under Trace Source, select `SWO`. Hit `Save to Project`. This enables SWO printf, which is what we're using to log messages from the board. Any SWO messages will show up in the "Terminal" window. I think it shows by default, but if not you can see it by selecting View->Terminal from the menu bar.
+10. You should save this debug configuration to your project folder by hitting File->Save Project As. The .gitignore should ignore any ozone files so feel free to name it whatever you want. 
+11. Now you can debug as usual. Whenever you rebuild the code, Ozone will automatically detect that the .elf file has changed and, when you switch focus back to Ozone, will ask if you want to reload it. I usually select the `Do not show again` checkbox and hit `Yes`. This way, Ozone will automatically flash and reset the board when it detects a change to the .elf file.
+12. Random tips:
+    - You can find a source file by clicking into the `Source Files` window and begin typing the name of the source file. It will search for and show the file. Handy if you want to set breakpoints in a given file.
+    - Same goes for the `Registers` window. Expand the bank you're interested in (likely Peripherals with 1708 registers, which we get from the nrf52.svd file), and then begin typing the name of the register you're interested in. 
+
+## Flashing The Board (VSCode)
+
+You can also flash/debug the board with VSCode, but in my experience it's clunkier than Ozone. I also don't think you can get a view of the registers. But feel free to experiment if interested!
 
 You have to download the [nrf command line tools](https://www.nordicsemi.com/Software-and-tools/Development-Tools/nRF-Command-Line-Tools/Download#infotabs) for this part (and the next part). Make sure they are added to your path variable.
 
@@ -88,7 +129,7 @@ A note on these ^, the `command`s have to point to *your* executable. After the 
 
 Once that's in there, you should be able to hit `F1`->`Tasks: Run Task`->`flash`, and compile/flash the program to your board!
 
-## Debugging The Board
+## Debugging The Board (VSCode)
 
 Make sure you have the [nrf command line tools](https://www.nordicsemi.com/Software-and-tools/Development-Tools/nRF-Command-Line-Tools/Download#infotabs) I talked about in the last section (and on your path!)
 
@@ -138,30 +179,4 @@ Copy/paste this over the launch.json file that is generated:
 ```
 
 Save, and now you should be able to debug your board from within VS Code by hitting the "run" button, and clicking the green arrow at the top of the panel. (Or, as with all things, you can set up a keyboard shortcut to do this).
-
-# Mbed Instructions (for posterity):
-
-## BLE Gatt Server example
-
-This application demonstrates detailed uses of the GattServer APIs.
-
-It starts by advertising to its environment with the device name "GattServer". Once you connect to the device with a BLE scanner on your phone, the scanner shows a service with three characteristics - each representing the hour, minute and second of a clock.
-
-To see the clock values updating subscribe to the service using the "Enable CCCDs" (or similar) option provided by the scanner. Now the values get updated once a second.
-
-## Running the application
-
-### Requirements
-
-You may use any BLE scanner, for example:
-
-- [nRF Master Control Panel](https://play.google.com/store/apps/details?id=no.nordicsemi.android.mcp) for Android.
-
-- [LightBlue](https://itunes.apple.com/gb/app/lightblue-bluetooth-low-energy/id557428110?mt=8) for iPhone.
-
-Hardware requirements are in the [main readme](https://github.com/ARMmbed/mbed-os-example-ble/blob/master/README.md).
-
-### Building instructions
-
-Building instructions for all samples are in the [main readme](https://github.com/ARMmbed/mbed-os-example-ble/blob/master/README.md).
 
