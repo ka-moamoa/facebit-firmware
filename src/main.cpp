@@ -1,5 +1,5 @@
 /* mbed Microcontroller Library
- * Copyright (c) 2017-2019 ARM Limited
+ * Copyright (c) 2006-2015 ARM Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,85 +14,27 @@
  * limitations under the License.
  */
 
-
 #include "mbed.h"
-
-#include "PinNames.h"
-
-#include "SPI.h"
-#include "I2C.h"
+#include "events/mbed_events.h"
+#include "ble/BLE.h"
 #include "SWO.h"
 #include "SWOLogger.h"
+#include "Heartrate.h"
 
-#include "BusControl.h"
-#include "FRAM.h"
-#include "Si7051.h"
-#include "LPS22HBSensor.h"
-#include "LSM6DSLSensor.h"
-#include "CapCalc.h"
+SWO_Channel SWO("channel");
 
-DigitalOut led(LED1);
-BusControl *bus_control = BusControl::get_instance();
+static events::EventQueue event_queue(/* event count */ 16 * EVENTS_EVENT_SIZE);
 
-SWO_Channel SWO; // for SWO logging
-I2C i2c(I2C_SDA0, I2C_SCL0);
-SPI spi(SPI_MOSI, SPI_MISO, SPI_SCK);
-
-CapCalc cap_monitor(VCAP, VCAP_ENABLE, 3000);
+/* Schedule processing of events from the BLE middleware in the event queue. */
+void schedule_ble_events(BLE::OnEventsToProcessCallbackContext *context)
+{
+    event_queue.call(Callback<void()>(&context->ble, &BLE::processEvents));
+}
 
 int main()
 {
-    while (1)
-    {
-        bus_control->spi_power(true);
-        ThisThread::sleep_for(10ms);
+    LOG_DEBUG("%s", "BLE Test Starting...");
 
-        LPS22HBSensor barometer(&spi, BAR_CS);
-        LSM6DSLSensor imu(&spi, IMU_CS);
-        FRAM fram(&spi, FRAM_CS);
-        Si7051 temp(&i2c);
-
-        barometer.init(NULL);
-        barometer.enable();
-
-        imu.init(NULL);
-        imu.enable_x();
-
-        ThisThread::sleep_for(100ms);
-
-        float pressure = 0;
-        barometer.get_pressure(&pressure);
-        LOG_DEBUG("pressure = %0.3f mbar", pressure);
-
-        int32_t data[3] = { 0 };
-        imu.get_x_axes(data);
-        LOG_DEBUG("imu data: x = %li, y = %li, z = %li", data[0], data[1], data[2]);
-
-        const char tx[4] = {0xAA, 0xBB, 0xCC, 0xDD};
-        fram.write_bytes(0x01, tx, 4);
-
-        char rx_buffer[4] = {0};
-        fram.read_bytes(0x01, rx_buffer, 4);
-        LOG_DEBUG("bytes1 = 0x%X, 0x%X, 0x%X, 0x%X", rx_buffer[0], rx_buffer[1], rx_buffer[2], rx_buffer[3]);
-
-        bus_control->spi_power(false);
-
-        bus_control->i2c_power(true);
-        ThisThread::sleep_for(100ms);
-
-        temp.initialize();
-        ThisThread::sleep_for(10ms);
-        float temperature = temp.readTemperature();
-        LOG_DEBUG("temperature = %0.3f C", temperature);
-
-        bus_control->i2c_power(false);
-
-        float voltage = cap_monitor.read_capacitor_voltage();
-        LOG_DEBUG("capacitor voltage = %0.3f V", voltage);
-
-        float joules = cap_monitor.calc_joules();
-        LOG_DEBUG("energy = %f J", joules);
-
-        ThisThread::sleep_for(500ms);
-    }
+    BLE &ble = BLE::Instance();
+    ble.onEventsToProcess(schedule_ble_events);
 }
