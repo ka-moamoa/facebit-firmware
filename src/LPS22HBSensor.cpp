@@ -55,6 +55,7 @@ LPS22HBSensor::LPS22HBSensor(SPI *spi, PinName cs_pin, PinName int_pin, SPI_type
         return;
     }       
 
+    _cs_pin = 1;    
     _dev_i2c=NULL;    
     
     if (_spi_type == SPI3W) LPS22HB_Set_SpiInterface ((void *)this, LPS22HB_SPI_3_WIRE);
@@ -82,8 +83,6 @@ LPS22HBSensor::LPS22HBSensor(DevI2C *i2c, uint8_t address, PinName int_pin) :
  */
 int LPS22HBSensor::init(void *init)
 {
-  _cs_pin = 1;    
-
   if ( LPS22HB_Set_PowerMode( (void *)this, LPS22HB_LowPower) == LPS22HB_ERROR )
   {
     return 1;
@@ -154,8 +153,6 @@ int LPS22HBSensor::enable(void)
  */
 int LPS22HBSensor::disable(void)
 {
-  _cs_pin = 0;
-
   /* Check if the component is already disabled */
   if ( _is_enabled == 0 )
   {
