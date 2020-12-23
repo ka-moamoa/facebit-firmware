@@ -1,5 +1,5 @@
 /* mbed Microcontroller Library
- * Copyright (c) 2006-2015 ARM Limited
+ * Copyright (c) 2017-2019 ARM Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,27 +14,89 @@
  * limitations under the License.
  */
 
-#include "mbed.h"
-#include "events/mbed_events.h"
-#include "ble/BLE.h"
 #include "SWO.h"
 #include "SWOLogger.h"
-#include "Heartrate.h"
+
+#include "SensorService.h"
+#include "ble/BLE.h"
+
+#include "SPI.h"
+#include "I2C.h"
+
+#include "BusControl.h"
+#include "Si7051.h"
+#include "LPS22HBSensor.h"
 
 SWO_Channel SWO("channel");
+I2C i2c(I2C_SDA0, I2C_SCL0);
+SPI spi(SPI_MOSI, SPI_MISO, SPI_SCK);
 
-static events::EventQueue event_queue(/* event count */ 16 * EVENTS_EVENT_SIZE);
+BusControl *bus_control = BusControl::get_instance();
 
-/* Schedule processing of events from the BLE middleware in the event queue. */
-void schedule_ble_events(BLE::OnEventsToProcessCallbackContext *context)
+LPS22HBSensor barometer(&spi, BAR_CS);
+Si7051 temp(&i2c);
+
+float readBarometer()
 {
-    event_queue.call(Callback<void()>(&context->ble, &BLE::processEvents));
+    bus_control->spi_power(true);
+    ThisThread::sleep_for(10ms);
+
+    barometer.init(NULL);
+    barometer.enable();
+
+    ThisThread::sleep_for(50ms);
+
+    float pressure = 0;
+    barometer.get_pressure(&pressure);
+
+    barometer.disable();
+
+    bus_control->spi_power(false);
+
+    return pressure;
 }
 
-int main()
+float readThermometer()
 {
-    LOG_DEBUG("%s", "BLE Test Starting...");
+    bus_control->i2c_power(true);
+    ThisThread::sleep_for(100ms);
+
+    temp.initialize();
+    ThisThread::sleep_for(10ms);
+    float temperature = temp.readTemperature();
+    LOG_DEBUG("temperature = %0.3f C", temperature);
+
+    bus_control->i2c_power(false);
+
+    return temperature;
+}
+
+int main() {
+    SWO.claim();
 
     BLE &ble = BLE::Instance();
-    ble.onEventsToProcess(schedule_ble_events);
+    events::EventQueue event_queue;
+    SensorService demo_service;
+
+    while(1)
+    {
+        float pressure = readBarometer();
+        demo_service.updateBarometer(pressure);
+        ThisThread::sleep_for(50ms);
+        float temperature = readThermometer();
+        demo_service.updateThermometer(temperature);
+        ThisThread::sleep_for(50ms);
+    }
+
+    /* this process will handle basic ble setup and advertising for us */
+    GattServerProcess ble_process(event_queue, ble);
+
+    /* once it's done it will let us continue with our demo */
+    ble_process.on_init(callback(&demo_service, &SensorService::start));
+
+    ble_process.start();
+
+
+
+    return 0;
 }
