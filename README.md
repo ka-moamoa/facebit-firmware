@@ -47,7 +47,7 @@ Here we get up and running with the base project. This ensures we're all able to
     ```
 
 4. I'm not sure if this step is required for Windows computer (or other Mac users, for that matter), but the first time I set this up I had to cd into the `mbed-os` directory and run `pip install -r requirements.txt --user`. I think the `--user` flag should only apply to Macs. `cd ..` back out into the root of the project if you do this.
-5. Now you should be able to run `mbed compile -t GCC_ARM -m NRF52_DK` and watch as your computer compiles the code!
+5. Now you should be able to run `mbed compile -t GCC_ARM -m SMARTPPE` and watch as your computer compiles the code!
 
 ## Visual Studio Code Setup
 
