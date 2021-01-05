@@ -1,5 +1,5 @@
 /* mbed Microcontroller Library
- * Copyright (c) 2017-2019 ARM Limited
+ * Copyright (c) 2006-2015 ARM Limited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,16 +14,11 @@
  * limitations under the License.
  */
 
-#include "PinNames.h"
-
-#include "SPI.h"
-#include "I2C.h"
-
-#include "SWO.h"
-#include "SWOLogger.h"
-
-// #include "SensorService.h"
-// #include "ble/BLE.h"
+#include <events/mbed_events.h>
+#include "ble/BLE.h"
+#include "ble/gap/Gap.h"
+#include "ble/services/HeartRateService.h"
+#include "pretty_printer.h"
 
 #include "BusControl.h"
 #include "Si7051.h"
@@ -31,88 +26,58 @@
 #include "FRAM.h"
 #include "LSM6DSLSensor.h"
 
-#include <events/mbed_events.h>
-#include "ble/BLE.h"
-#include "ble/Gap.h"
-#include "ble/services/HeartRateService.h"
-#include "pretty_printer.h"
+#include "SPI.h"
 
-DigitalOut led(LED1);
+#include "PinNames.h"
+#include "SWO.h"
 
-float last_pressure_reading = 0.0;
-float last_temp_reading = 0.0;
-
-Thread thread1(osPriorityNormal);
-Thread thread2(osPriorityNormal);
-
-SWO_Channel SWO("channel");
-I2C i2c(I2C_SDA0, I2C_SCL0);
-SPI spi(SPI_MOSI, SPI_MISO, SPI_SCK);
-
-BusControl *bus_control = BusControl::get_instance();
+SWO_Channel swo("channel");
 
 using namespace std::literals::chrono_literals;
 
-const static char DEVICE_NAME[] = "SMART-PPE";
+const static char DEVICE_NAME[] = "Heartrate";
+
+static events::EventQueue event_queue(/* event count */ 16 * EVENTS_EVENT_SIZE);
+
+Thread thread1;
+Thread thread2;
+DigitalOut led(LED1);
 
 void led_thread()
 {
-    while(true)
+    while(1)
     {
         led = !led;
-        ThisThread::sleep_for(500ms);
+        ThisThread::sleep_for(50ms);
     }
 }
 
-float readBarometer()
-{    
-    bus_control->spi_power(true);
-    ThisThread::sleep_for(10ms);
-
-    LPS22HBSensor barometer(&spi, BAR_CS);
-    ThisThread::sleep_for(1ms);
-
-    barometer.init(NULL);
-    barometer.enable();
-
-    ThisThread::sleep_for(10ms);
-
-    float pressure = 0;
-    barometer.get_pressure(&pressure);
-
-    bus_control->spi_power(false);
-
-    return pressure;
-}
-
-float readThermometer()
-{
-    Si7051 temp(&i2c);
-
-    bus_control->i2c_power(true);
-    ThisThread::sleep_for(20ms);
-
-    temp.initialize();
-    ThisThread::sleep_for(1ms);
-    float temperature = temp.readTemperature();
-
-    bus_control->i2c_power(false);
-
-    return temperature;
-}
 
 void sensor_thread()
 {
-    while(true)
+    BusControl *bus_control = BusControl::get_instance();
+    SPI spi(SPI_MOSI, SPI_MISO, SPI_SCK);
+    LPS22HBSensor barometer(&spi, BAR_CS);
+
+    while(1)
     {
-        // last_pressure_reading = readBarometer();
-        // last_temp_reading = readThermometer();
-        // ThisThread::sleep_for(100ms);
-        ThisThread::yield();
+        bus_control->spi_power(true);
+        ThisThread::sleep_for(10ms);
+
+        barometer.init(NULL);
+        barometer.enable();
+
+        ThisThread::sleep_for(100ms);
+
+        float pressure = 0;
+        barometer.get_pressure(&pressure);
+        printf("pressure = %0.3f\r\n", pressure);
+
+
+        bus_control->spi_power(false);
+        ThisThread::sleep_for(100ms);
     }
 }
-
-static events::EventQueue event_queue(/* event count */ 16 * EVENTS_EVENT_SIZE);
 
 class HeartrateDemo : ble::Gap::EventHandler {
 public:
@@ -262,15 +227,15 @@ void schedule_ble_events(BLE::OnEventsToProcessCallbackContext *context)
 
 int main()
 {
-    SWO.claim();
-    // thread1.start(led_thread);
-    thread2.start(sensor_thread);
-
+    swo.claim();
     BLE &ble = BLE::Instance();
     ble.onEventsToProcess(schedule_ble_events);
 
-    HeartrateDemo demo(ble, event_queue);
-    demo.start();
+    thread1.start(led_thread);
+    thread2.start(sensor_thread);
+
+    // HeartrateDemo demo(ble, event_queue);
+    // demo.start();
 
     return 0;
 }
