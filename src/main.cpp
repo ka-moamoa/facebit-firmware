@@ -44,7 +44,7 @@ Thread thread2;
 DigitalOut led(LED1);
 Mutex pressure_mutex;
 
-float g_pressure = 50;
+float g_pressure = 0;
 
 void set_pressure(float pressure)
 {
@@ -55,14 +55,10 @@ void set_pressure(float pressure)
 
 float get_pressure()
 {
-    g_pressure++;
-
-    if (g_pressure > 165)
-    {
-        g_pressure = 50;
-    }
-
-    return g_pressure;
+    pressure_mutex.lock();
+    float pressure = g_pressure;
+    pressure_mutex.unlock();
+    return pressure;
 }
 
 void led_thread()
@@ -70,7 +66,7 @@ void led_thread()
     while(1)
     {
         led = !led;
-        ThisThread::sleep_for(50ms);
+        ThisThread::sleep_for(100ms);
     }
 }
 
@@ -189,9 +185,9 @@ private:
     {
         float pressure = get_pressure();
 
-        // int pressurex10 = pressure * 10;
+        int pressurex10 = pressure * 10;
 
-        _heartrate_service.updateHeartRate(pressure);
+        _heartrate_service.updateHeartRate(pressurex10);
     }
 
     /* these implement ble::Gap::EventHandler */
@@ -242,7 +238,7 @@ int main()
     ble.onEventsToProcess(schedule_ble_events);
 
     thread1.start(led_thread);
-    // thread2.start(sensor_thread);
+    thread2.start(sensor_thread);
 
     HeartrateDemo demo(ble, event_queue);
     demo.start();
