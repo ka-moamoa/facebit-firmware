@@ -35,13 +35,35 @@ SWO_Channel swo("channel");
 
 using namespace std::literals::chrono_literals;
 
-const static char DEVICE_NAME[] = "Heartrate";
+const static char DEVICE_NAME[] = "SMARTPPE";
 
 static events::EventQueue event_queue(/* event count */ 16 * EVENTS_EVENT_SIZE);
 
 Thread thread1;
 Thread thread2;
 DigitalOut led(LED1);
+Mutex pressure_mutex;
+
+float g_pressure = 50;
+
+void set_pressure(float pressure)
+{
+    pressure_mutex.lock();
+    g_pressure = pressure;
+    pressure_mutex.unlock();
+}
+
+float get_pressure()
+{
+    g_pressure++;
+
+    if (g_pressure > 165)
+    {
+        g_pressure = 50;
+    }
+
+    return g_pressure;
+}
 
 void led_thread()
 {
@@ -52,30 +74,22 @@ void led_thread()
     }
 }
 
+BusControl *bus_control = BusControl::get_instance();
 
 void sensor_thread()
 {
-    BusControl *bus_control = BusControl::get_instance();
     SPI spi(SPI_MOSI, SPI_MISO, SPI_SCK);
     LPS22HBSensor barometer(&spi, BAR_CS);
-
+    bus_control->spi_power(true);
+    barometer.init(NULL);
+    
     while(1)
     {
-        bus_control->spi_power(true);
-        ThisThread::sleep_for(10ms);
-
-        barometer.init(NULL);
         barometer.enable();
-
         ThisThread::sleep_for(100ms);
-
         float pressure = 0;
         barometer.get_pressure(&pressure);
-        printf("pressure = %0.3f\r\n", pressure);
-
-
-        bus_control->spi_power(false);
-        ThisThread::sleep_for(100ms);
+        set_pressure(pressure);
     }
 }
 
@@ -173,15 +187,11 @@ private:
 
     void update_sensor_value()
     {
-        /* you can read in the real value but here we just simulate a value */
-        _heartrate_value++;
+        float pressure = get_pressure();
 
-        /*  100 <= bpm value <= 175 */
-        if (_heartrate_value == 175) {
-            _heartrate_value = 100;
-        }
+        // int pressurex10 = pressure * 10;
 
-        _heartrate_service.updateHeartRate(_heartrate_value);
+        _heartrate_service.updateHeartRate(pressure);
     }
 
     /* these implement ble::Gap::EventHandler */
@@ -232,10 +242,10 @@ int main()
     ble.onEventsToProcess(schedule_ble_events);
 
     thread1.start(led_thread);
-    thread2.start(sensor_thread);
+    // thread2.start(sensor_thread);
 
-    // HeartrateDemo demo(ble, event_queue);
-    // demo.start();
+    HeartrateDemo demo(ble, event_queue);
+    demo.start();
 
     return 0;
 }
