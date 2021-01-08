@@ -20,6 +20,7 @@ public:
 
     static BusControl* get_instance();
 
+    void init(void);
     void spi_power(bool power);
     void i2c_power(bool power);
 private:

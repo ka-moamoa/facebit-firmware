@@ -16,9 +16,7 @@
 
 #include <events/mbed_events.h>
 #include "ble/BLE.h"
-#include "ble/gap/Gap.h"
-#include "ble/services/HeartRateService.h"
-#include "pretty_printer.h"
+#include "gatt_server_process.h"
 
 #include "BusControl.h"
 #include "Si7051.h"
@@ -42,24 +40,7 @@ static events::EventQueue event_queue(/* event count */ 16 * EVENTS_EVENT_SIZE);
 Thread thread1;
 Thread thread2;
 DigitalOut led(LED1);
-Mutex pressure_mutex;
-
-float g_pressure = 0;
-
-void set_pressure(float pressure)
-{
-    pressure_mutex.lock();
-    g_pressure = pressure;
-    pressure_mutex.unlock();
-}
-
-float get_pressure()
-{
-    pressure_mutex.lock();
-    float pressure = g_pressure;
-    pressure_mutex.unlock();
-    return pressure;
-}
+BusControl *bus_control = BusControl::get_instance();
 
 void led_thread()
 {
@@ -70,178 +51,147 @@ void led_thread()
     }
 }
 
-BusControl *bus_control = BusControl::get_instance();
+class SmartPPEService : ble::GattServer::EventHandler {
 
-void sensor_thread()
+    const char* PRESSURE_UUID = "0F1F34A3-4567-484C-ACA2-CC8F662E8781";
+    const char* TEMPERATURE_UUID = "0F1F34A3-4567-484C-ACA2-CC8F662E8782";
+    const char* AIR_QUALITY_UUID = "0F1F34A3-4567-484C-ACA2-CC8F662E8783";
+    const char* MAGNETOMETER_UUID = "0F1F34A3-4567-484C-ACA2-CC8F662E8784";
+    const char* IMU_UUID = "0F1F34A3-4567-484C-ACA2-CC8F662E8785";
+    const char* MICROPHONE_UUID = "0F1F34A3-4567-484C-ACA2-CC8F662E8786";
+
+public:
+    SmartPPEService()
+    {
+        const UUID pressure_uuid(PRESSURE_UUID);
+        const UUID temp_uuid(TEMPERATURE_UUID);
+        const UUID air_q_uuid(AIR_QUALITY_UUID);
+        const UUID mag_uuid(MAGNETOMETER_UUID);
+        const UUID imu_uuid(IMU_UUID);
+        const UUID mic_uuid(MICROPHONE_UUID);
+
+        _pressure_characteristic = new ReadOnlyGattCharacteristic<uint32_t> (pressure_uuid, &p_initial_value,  GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_NOTIFY);
+        if (!_pressure_characteristic) {
+            printf("Allocation of pressure characteristic failed\r\n");
+        }
+
+        _temperature_characteristic = new ReadOnlyGattCharacteristic<uint16_t> (temp_uuid, &initial_value, GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_NOTIFY);
+        if (!_temperature_characteristic) {
+            printf("Allocation of temperature characteristic failed\r\n");
+        }
+
+        _air_quality_characteristic = new ReadOnlyGattCharacteristic<uint16_t> (air_q_uuid, &initial_value, GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_NOTIFY);
+        if (!_air_quality_characteristic) {
+            printf("Allocation of air quality characteristic failed\r\n");
+        }
+
+        _mag_characteristic = new ReadOnlyGattCharacteristic<uint16_t> (mag_uuid, &initial_value, GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_NOTIFY);
+        if (!_mag_characteristic) {
+            printf("Allocation of magnetometer characteristic failed\r\n");
+        }
+
+        _imu_characteristic = new ReadOnlyGattCharacteristic<uint16_t> (imu_uuid, &initial_value, GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_NOTIFY);
+        if (!_imu_characteristic) {
+            printf("Allocation of imu characteristic failed\r\n");
+        }
+
+        _mic_characteristic = new ReadOnlyGattCharacteristic<uint16_t> (mic_uuid, &initial_value, GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_NOTIFY);
+        if (!_mic_characteristic) {
+            printf("Allocation of mic characteristic failed\r\n");
+        }
+    }
+
+    ~SmartPPEService()
+    {
+    }
+
+    void start(BLE &ble, events::EventQueue &event_queue)
+    {
+        const UUID uuid = "6243fabc-23e9-4b79-bd30-1dc57b8005d6";
+        GattCharacteristic* charTable[] = { 
+            _pressure_characteristic,  
+            _temperature_characteristic,
+            _air_quality_characteristic,
+            _mag_characteristic,
+            _imu_characteristic,
+            _mic_characteristic };
+        GattService smart_ppe_service(uuid, charTable, 6);
+
+        _server = &ble.gattServer();
+
+        _server->addService(smart_ppe_service);
+
+        _server->setEventHandler(this);
+
+        printf("Example service added with UUID 6243fabc-23e9-4b79-bd30-1dc57b8005d6\r\n");
+    }
+
+    void updatePressure(uint32_t pressurex100)
+    {
+        const uint8_t new_pressure[4] = {
+            (pressurex100 >>24) & 0xFF,
+            (pressurex100 >>16) & 0xFF,
+            (pressurex100 >>8) & 0xFF,
+            (pressurex100) & 0xFF };
+
+        _server->write(_pressure_characteristic->getValueHandle(), new_pressure, 4);
+    }
+
+private:
+    GattServer* _server = nullptr;
+
+    ReadOnlyGattCharacteristic<uint32_t>* _pressure_characteristic = nullptr;
+    ReadOnlyGattCharacteristic<uint16_t>* _temperature_characteristic = nullptr;
+    ReadOnlyGattCharacteristic<uint16_t>* _air_quality_characteristic = nullptr;
+    ReadOnlyGattCharacteristic<uint16_t>* _imu_characteristic = nullptr;
+    ReadOnlyGattCharacteristic<uint16_t>* _mag_characteristic = nullptr;
+    ReadOnlyGattCharacteristic<uint16_t>* _mic_characteristic = nullptr;
+
+    uint16_t initial_value = 0;
+    uint32_t p_initial_value = 0;
+};
+
+// /* Schedule processing of events from the BLE middleware in the event queue. */
+// void schedule_ble_events(BLE::OnEventsToProcessCallbackContext *context)
+// {
+//     event_queue.call(Callback<void()>(&context->ble, &BLE::processEvents));
+// }
+
+void sensor_thread(SmartPPEService* smart_ppe_service)
 {
     SPI spi(SPI_MOSI, SPI_MISO, SPI_SCK);
     LPS22HBSensor barometer(&spi, BAR_CS);
+    bus_control->init();
     bus_control->spi_power(true);
+    ThisThread::sleep_for(200ms);
     barometer.init(NULL);
+    barometer.enable();
     
     while(1)
     {
-        barometer.enable();
-        ThisThread::sleep_for(100ms);
+        ThisThread::sleep_for(200ms);
         float pressure = 0;
         barometer.get_pressure(&pressure);
-        set_pressure(pressure);
+        printf("pressure = %0.2f mbar\r\n", pressure);
+        smart_ppe_service->updatePressure((uint32_t)(pressure*100));
     }
-}
-
-class HeartrateDemo : ble::Gap::EventHandler {
-public:
-    HeartrateDemo(BLE &ble, events::EventQueue &event_queue) :
-        _ble(ble),
-        _event_queue(event_queue),
-        _heartrate_uuid(GattService::UUID_HEART_RATE_SERVICE),
-        _heartrate_value(100),
-        _heartrate_service(ble, _heartrate_value, HeartRateService::LOCATION_FINGER),
-        _adv_data_builder(_adv_buffer)
-    {
-    }
-
-    void start()
-    {
-        _ble.init(this, &HeartrateDemo::on_init_complete);
-
-        _event_queue.dispatch_forever();
-    }
-
-private:
-    /** Callback triggered when the ble initialization process has finished */
-    void on_init_complete(BLE::InitializationCompleteCallbackContext *params)
-    {
-        if (params->error != BLE_ERROR_NONE) {
-            printf("Ble initialization failed.");
-            return;
-        }
-
-        print_mac_address();
-
-        /* this allows us to receive events like onConnectionComplete() */
-        _ble.gap().setEventHandler(this);
-
-        /* heart rate value updated every second */
-        _event_queue.call_every(
-            1000ms,
-            [this] {
-                update_sensor_value();
-            }
-        );
-
-        start_advertising();
-    }
-
-    void start_advertising()
-    {
-        /* Create advertising parameters and payload */
-
-        ble::AdvertisingParameters adv_parameters(
-            ble::advertising_type_t::CONNECTABLE_UNDIRECTED,
-            ble::adv_interval_t(ble::millisecond_t(100))
-        );
-
-        _adv_data_builder.setFlags();
-        _adv_data_builder.setAppearance(ble::adv_data_appearance_t::GENERIC_HEART_RATE_SENSOR);
-        _adv_data_builder.setLocalServiceList({&_heartrate_uuid, 1});
-        _adv_data_builder.setName(DEVICE_NAME);
-
-        /* Setup advertising */
-
-        ble_error_t error = _ble.gap().setAdvertisingParameters(
-            ble::LEGACY_ADVERTISING_HANDLE,
-            adv_parameters
-        );
-
-        if (error) {
-            printf("_ble.gap().setAdvertisingParameters() failed\r\n");
-            return;
-        }
-
-        error = _ble.gap().setAdvertisingPayload(
-            ble::LEGACY_ADVERTISING_HANDLE,
-            _adv_data_builder.getAdvertisingData()
-        );
-
-        if (error) {
-            printf("_ble.gap().setAdvertisingPayload() failed\r\n");
-            return;
-        }
-
-        /* Start advertising */
-
-        error = _ble.gap().startAdvertising(ble::LEGACY_ADVERTISING_HANDLE);
-
-        if (error) {
-            printf("_ble.gap().startAdvertising() failed\r\n");
-            return;
-        }
-
-        printf("Heart rate sensor advertising, please connect\r\n");
-    }
-
-    void update_sensor_value()
-    {
-        float pressure = get_pressure();
-
-        int pressurex10 = pressure * 10;
-
-        _heartrate_service.updateHeartRate(pressurex10);
-    }
-
-    /* these implement ble::Gap::EventHandler */
-private:
-    /* when we connect we stop advertising, restart advertising so others can connect */
-    virtual void onConnectionComplete(const ble::ConnectionCompleteEvent &event)
-    {
-        if (event.getStatus() == ble_error_t::BLE_ERROR_NONE) {
-            printf("Client connected, you may now subscribe to updates\r\n");
-        }
-    }
-
-    /* when we connect we stop advertising, restart advertising so others can connect */
-    virtual void onDisconnectionComplete(const ble::DisconnectionCompleteEvent &event)
-    {
-        printf("Client disconnected, restarting advertising\r\n");
-
-        ble_error_t error = _ble.gap().startAdvertising(ble::LEGACY_ADVERTISING_HANDLE);
-
-        if (error) {
-            printf("_ble.gap().startAdvertising() failed\r\n");
-            return;
-        }
-    }
-
-private:
-    BLE &_ble;
-    events::EventQueue &_event_queue;
-
-    UUID _heartrate_uuid;
-    uint8_t _heartrate_value;
-    HeartRateService _heartrate_service;
-
-    uint8_t _adv_buffer[ble::LEGACY_ADVERTISING_MAX_SIZE];
-    ble::AdvertisingDataBuilder _adv_data_builder;
-};
-
-/* Schedule processing of events from the BLE middleware in the event queue. */
-void schedule_ble_events(BLE::OnEventsToProcessCallbackContext *context)
-{
-    event_queue.call(Callback<void()>(&context->ble, &BLE::processEvents));
 }
 
 int main()
 {
     swo.claim();
     BLE &ble = BLE::Instance();
-    ble.onEventsToProcess(schedule_ble_events);
+    // ble.onEventsToProcess(schedule_ble_events);
+
+    SmartPPEService smart_ppe_ble;
 
     thread1.start(led_thread);
-    thread2.start(sensor_thread);
+    thread2.start(callback(sensor_thread, &smart_ppe_ble));
 
-    HeartrateDemo demo(ble, event_queue);
-    demo.start();
+    GattServerProcess ble_process(event_queue, ble);
+    ble_process.on_init(callback(&smart_ppe_ble, &SmartPPEService::start));
+
+    ble_process.start();
 
     return 0;
 }
