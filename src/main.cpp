@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-#include <events/mbed_events.h>
-#include "ble/BLE.h"
 #include "gatt_server_process.h"
 
 #include "PinNames.h"
@@ -32,6 +30,8 @@
 #include "LPS22HBSensor.h"
 #include "LSM6DSLSensor.h"
 #include "CapCalc.h"
+
+#include "SmartPPEService.h"
 
 DigitalOut led(LED1);
 BusControl *bus_control = BusControl::get_instance();
@@ -64,105 +64,6 @@ void led_thread()
     }
 }
 
-class SmartPPEService : ble::GattServer::EventHandler {
-
-    const char* PRESSURE_UUID = "0F1F34A3-4567-484C-ACA2-CC8F662E8781";
-    const char* TEMPERATURE_UUID = "0F1F34A3-4567-484C-ACA2-CC8F662E8782";
-    const char* AIR_QUALITY_UUID = "0F1F34A3-4567-484C-ACA2-CC8F662E8783";
-    const char* MAGNETOMETER_UUID = "0F1F34A3-4567-484C-ACA2-CC8F662E8784";
-    const char* IMU_UUID = "0F1F34A3-4567-484C-ACA2-CC8F662E8785";
-    const char* MICROPHONE_UUID = "0F1F34A3-4567-484C-ACA2-CC8F662E8786";
-
-public:
-    SmartPPEService()
-    {
-        const UUID pressure_uuid(PRESSURE_UUID);
-        const UUID temp_uuid(TEMPERATURE_UUID);
-        const UUID air_q_uuid(AIR_QUALITY_UUID);
-        const UUID mag_uuid(MAGNETOMETER_UUID);
-        const UUID imu_uuid(IMU_UUID);
-        const UUID mic_uuid(MICROPHONE_UUID);
-
-        _pressure_characteristic = new ReadOnlyGattCharacteristic<uint32_t> (pressure_uuid, &p_initial_value,  GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_NOTIFY);
-        if (!_pressure_characteristic) {
-            printf("Allocation of pressure characteristic failed\r\n");
-        }
-
-        _temperature_characteristic = new ReadOnlyGattCharacteristic<uint16_t> (temp_uuid, &initial_value, GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_NOTIFY);
-        if (!_temperature_characteristic) {
-            printf("Allocation of temperature characteristic failed\r\n");
-        }
-
-        _air_quality_characteristic = new ReadOnlyGattCharacteristic<uint16_t> (air_q_uuid, &initial_value, GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_NOTIFY);
-        if (!_air_quality_characteristic) {
-            printf("Allocation of air quality characteristic failed\r\n");
-        }
-
-        _mag_characteristic = new ReadOnlyGattCharacteristic<uint16_t> (mag_uuid, &initial_value, GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_NOTIFY);
-        if (!_mag_characteristic) {
-            printf("Allocation of magnetometer characteristic failed\r\n");
-        }
-
-        _imu_characteristic = new ReadOnlyGattCharacteristic<uint16_t> (imu_uuid, &initial_value, GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_NOTIFY);
-        if (!_imu_characteristic) {
-            printf("Allocation of imu characteristic failed\r\n");
-        }
-
-        _mic_characteristic = new ReadOnlyGattCharacteristic<uint16_t> (mic_uuid, &initial_value, GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_NOTIFY);
-        if (!_mic_characteristic) {
-            printf("Allocation of mic characteristic failed\r\n");
-        }
-    }
-
-    ~SmartPPEService()
-    {
-    }
-
-    void start(BLE &ble, events::EventQueue &event_queue)
-    {
-        const UUID uuid = "6243fabc-23e9-4b79-bd30-1dc57b8005d6";
-        GattCharacteristic* charTable[] = { 
-            _pressure_characteristic,  
-            _temperature_characteristic,
-            _air_quality_characteristic,
-            _mag_characteristic,
-            _imu_characteristic,
-            _mic_characteristic };
-        GattService smart_ppe_service(uuid, charTable, 6);
-
-        _server = &ble.gattServer();
-
-        _server->addService(smart_ppe_service);
-
-        _server->setEventHandler(this);
-
-        printf("Example service added with UUID 6243fabc-23e9-4b79-bd30-1dc57b8005d6\r\n");
-    }
-
-    void updatePressure(uint32_t pressurex100)
-    {
-        const uint8_t new_pressure[4] = {
-            (pressurex100 >>24) & 0xFF,
-            (pressurex100 >>16) & 0xFF,
-            (pressurex100 >>8) & 0xFF,
-            (pressurex100) & 0xFF };
-
-        _server->write(_pressure_characteristic->getValueHandle(), new_pressure, 4);
-    }
-
-private:
-    GattServer* _server = nullptr;
-
-    ReadOnlyGattCharacteristic<uint32_t>* _pressure_characteristic = nullptr;
-    ReadOnlyGattCharacteristic<uint16_t>* _temperature_characteristic = nullptr;
-    ReadOnlyGattCharacteristic<uint16_t>* _air_quality_characteristic = nullptr;
-    ReadOnlyGattCharacteristic<uint16_t>* _imu_characteristic = nullptr;
-    ReadOnlyGattCharacteristic<uint16_t>* _mag_characteristic = nullptr;
-    ReadOnlyGattCharacteristic<uint16_t>* _mic_characteristic = nullptr;
-
-    uint16_t initial_value = 0;
-    uint32_t p_initial_value = 0;
-};
 
 // /* Schedule processing of events from the BLE middleware in the event queue. */
 // void schedule_ble_events(BLE::OnEventsToProcessCallbackContext *context)
@@ -173,6 +74,7 @@ private:
 void sensor_thread(SmartPPEService* smart_ppe_service)
 {   
     ThisThread::sleep_for(1s);
+    bus_control->init();
 
     while(1)
     {
@@ -210,6 +112,7 @@ void sensor_thread(SmartPPEService* smart_ppe_service)
         ThisThread::sleep_for(10ms);
         float temperature = temp.readTemperature();
         LOG_DEBUG("temperature = %0.3f C", temperature);
+        smart_ppe_service->updateTemperature((uint32_t)(temperature*10000));
 
         bus_control->i2c_power(false);
 
