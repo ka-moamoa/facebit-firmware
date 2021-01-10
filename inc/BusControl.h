@@ -46,6 +46,9 @@ private:
     // I2C pullup
     DigitalOut _i2c_pu; // must be high drive
 
+    // Initialized flag
+    bool _initialized = false;
+
     static BusControl* _instance;
     static Mutex _mutex;
 };
