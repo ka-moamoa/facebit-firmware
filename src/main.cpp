@@ -18,16 +18,29 @@
 #include "ble/BLE.h"
 #include "gatt_server_process.h"
 
-#include "BusControl.h"
-#include "Si7051.h"
-#include "LPS22HBSensor.h"
-#include "FRAM.h"
-#include "LSM6DSLSensor.h"
+#include "PinNames.h"
+#include "mbed.h"
 
 #include "SPI.h"
-
-#include "PinNames.h"
+#include "I2C.h"
 #include "SWO.h"
+#include "SWOLogger.h"
+
+#include "BusControl.h"
+#include "FRAM.h"
+#include "Si7051.h"
+#include "LPS22HBSensor.h"
+#include "LSM6DSLSensor.h"
+#include "CapCalc.h"
+
+DigitalOut led(LED1);
+BusControl *bus_control = BusControl::get_instance();
+
+SWO_Channel SWO; // for SWO logging
+I2C i2c(I2C_SDA0, I2C_SCL0);
+SPI spi(SPI_MOSI, SPI_MISO, SPI_SCK);
+
+CapCalc cap_monitor(VCAP, VCAP_ENABLE, 3000);
 
 SWO_Channel swo("channel");
 
@@ -39,15 +52,15 @@ static events::EventQueue event_queue(/* event count */ 16 * EVENTS_EVENT_SIZE);
 
 Thread thread1;
 Thread thread2;
-DigitalOut led(LED1);
-BusControl *bus_control = BusControl::get_instance();
 
 void led_thread()
 {
     while(1)
     {
-        led = !led;
-        ThisThread::sleep_for(100ms);
+        led = 0;
+        ThisThread::sleep_for(1000ms);
+        led = 1;
+        ThisThread::sleep_for(10ms);
     }
 }
 
@@ -158,22 +171,55 @@ private:
 // }
 
 void sensor_thread(SmartPPEService* smart_ppe_service)
-{
-    SPI spi(SPI_MOSI, SPI_MISO, SPI_SCK);
-    LPS22HBSensor barometer(&spi, BAR_CS);
-    bus_control->init();
-    bus_control->spi_power(true);
-    ThisThread::sleep_for(200ms);
-    barometer.init(NULL);
-    barometer.enable();
-    
+{   
+    ThisThread::sleep_for(1s);
+
     while(1)
     {
-        ThisThread::sleep_for(200ms);
+        bus_control->spi_power(true);
+        ThisThread::sleep_for(10ms);
+
+        LPS22HBSensor barometer(&spi, BAR_CS);
+        LSM6DSLSensor imu(&spi, IMU_CS);
+        FRAM fram(&spi, FRAM_CS);
+        Si7051 temp(&i2c);
+
+        barometer.init(NULL);
+        barometer.enable();
+
+        imu.init(NULL);
+        imu.enable_x();
+
+        ThisThread::sleep_for(100ms);
+
         float pressure = 0;
         barometer.get_pressure(&pressure);
-        printf("pressure = %0.2f mbar\r\n", pressure);
+        LOG_DEBUG("pressure = %0.3f mbar", pressure);
         smart_ppe_service->updatePressure((uint32_t)(pressure*100));
+
+        int32_t data[3] = { 0 };
+        imu.get_x_axes(data);
+        LOG_DEBUG("imu data: x = %li, y = %li, z = %li", data[0], data[1], data[2]);
+
+        bus_control->spi_power(false);
+
+        bus_control->i2c_power(true);
+        ThisThread::sleep_for(100ms);
+
+        temp.initialize();
+        ThisThread::sleep_for(10ms);
+        float temperature = temp.readTemperature();
+        LOG_DEBUG("temperature = %0.3f C", temperature);
+
+        bus_control->i2c_power(false);
+
+        float voltage = cap_monitor.read_capacitor_voltage();
+        LOG_DEBUG("capacitor voltage = %0.3f V", voltage);
+
+        float joules = cap_monitor.calc_joules();
+        LOG_DEBUG("energy = %f J", joules);
+
+        ThisThread::sleep_for(100ms);
     }
 }
 
