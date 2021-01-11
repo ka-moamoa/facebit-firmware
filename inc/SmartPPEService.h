@@ -99,7 +99,7 @@ public:
             (uint8_t)((temperaturex10000 >>8) & 0xFF),
             (uint8_t)((temperaturex10000) & 0xFF) };
 
-        _server->write(_pressure_characteristic->getValueHandle(), temp_array, 4);
+        _server->write(_temperature_characteristic->getValueHandle(), temp_array, 4);
     }
 
 private:

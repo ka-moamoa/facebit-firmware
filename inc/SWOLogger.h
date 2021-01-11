@@ -12,7 +12,7 @@ enum
     TRACE_WARNING
 };
 
-const uint8_t trace_level = TRACE_INFO;
+const uint8_t trace_level = TRACE_DEBUG;
 
 #define LOG_DEBUG(msg, ...) \
 { \
