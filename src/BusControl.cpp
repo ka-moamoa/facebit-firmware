@@ -1,5 +1,6 @@
 #include "BusControl.h"
 #include "PinNames.h"
+#include "SWOLogger.h"
 
 BusControl* BusControl::_instance = nullptr;
 Mutex BusControl::_mutex;
@@ -17,9 +18,7 @@ _temp_vcc(TEMP_VCC),
 _voc_vcc(VOC_VCC),
 _i2c_pu(I2C_PULLUP)
 {
-    NRF_GPIO->PIN_CNF[IMU_VCC] |= (GPIO_PIN_CNF_DRIVE_S0H1 << GPIO_PIN_CNF_DRIVE_Pos); // set to high drive mode
-    NRF_GPIO->PIN_CNF[TEMP_VCC] |= (GPIO_PIN_CNF_DRIVE_S0H1 << GPIO_PIN_CNF_DRIVE_Pos); // set to high drive mode
-    NRF_GPIO->PIN_CNF[I2C_PULLUP] |= (GPIO_PIN_CNF_DRIVE_S0H1 << GPIO_PIN_CNF_DRIVE_Pos); // set to high drive mode
+
 }
 
 BusControl::~BusControl() {}
@@ -38,8 +37,23 @@ BusControl* BusControl::get_instance()
     return _instance;
 }
 
+void BusControl::init(void)
+{
+    NRF_GPIO->PIN_CNF[IMU_VCC] |= (GPIO_PIN_CNF_DRIVE_S0H1 << GPIO_PIN_CNF_DRIVE_Pos); // set to high drive mode
+    NRF_GPIO->PIN_CNF[TEMP_VCC] |= (GPIO_PIN_CNF_DRIVE_S0H1 << GPIO_PIN_CNF_DRIVE_Pos); // set to high drive mode
+    NRF_GPIO->PIN_CNF[I2C_PULLUP] |= (GPIO_PIN_CNF_DRIVE_S0H1 << GPIO_PIN_CNF_DRIVE_Pos); // set to high drive mode
+
+    _initialized = true;
+}
+
 void BusControl::spi_power(bool power)
 {
+    if (!_initialized)
+    {
+        LOG_WARNING("%s", "Bus Control has not been initialized. Please run init().")
+        return;
+    }
+
     _fram_vcc = power;
     _bar_vcc = power;
     _mag_vcc = power;
@@ -54,6 +68,12 @@ void BusControl::spi_power(bool power)
 
 void BusControl::i2c_power(bool power)
 {
+    if (!_initialized)
+    {
+        LOG_WARNING("%s", "Bus Control has not been initialized. Please run init().")
+        return;
+    }
+
     _temp_vcc = power;
     _voc_vcc = power;
     _i2c_pu = power;

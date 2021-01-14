@@ -10,9 +10,6 @@
             "5"
         ],
         "device_name": "nRF52832_xxAA",
-        "device_has_remove": [
-            "ITM"
-        ],
         "macros_add": [
             "WSF_MAX_HANDLERS=10",
             "CONFIG_GPIO_AS_PINRESET",

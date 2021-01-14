@@ -20,6 +20,7 @@ public:
 
     static BusControl* get_instance();
 
+    void init(void);
     void spi_power(bool power);
     void i2c_power(bool power);
 private:
@@ -44,6 +45,9 @@ private:
 
     // I2C pullup
     DigitalOut _i2c_pu; // must be high drive
+
+    // Initialized flag
+    bool _initialized = false;
 
     static BusControl* _instance;
     static Mutex _mutex;
