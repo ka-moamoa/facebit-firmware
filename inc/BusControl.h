@@ -23,6 +23,9 @@ public:
     void init(void);
     void spi_power(bool power);
     void i2c_power(bool power);
+
+    bool get_spi_power();
+    bool get_i2c_power();
 private:
     BusControl(); //Singleton
     ~BusControl();
@@ -51,6 +54,9 @@ private:
 
     static BusControl* _instance;
     static Mutex _mutex;
+
+    bool _spi_power = false;
+    bool _i2c_power = false;
 };
 
 

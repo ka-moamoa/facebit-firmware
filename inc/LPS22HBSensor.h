@@ -105,6 +105,8 @@ class LPS22HBSensor : public PressureSensor, public TempSensor
     int get_fifo_mode(uint8_t *mode);
     int get_fifo_status(uint8_t *status);
     int get_fifo(LPS22HB_Data_st *data);
+    int get_pressure_fifo(float *pfData);
+    int get_temperature_fifo(float *pfData);
     /**
      * @brief Utility function to read data.
      * @param  pBuffer: pointer to data to be read.
@@ -161,8 +163,6 @@ class LPS22HBSensor : public PressureSensor, public TempSensor
   private:
     int Set_ODR_When_Enabled(float odr);
     int Set_ODR_When_Disabled(float odr);
-    int get_pressure_fifo(float *pfData);
-    int get_temperature_fifo(float *pfData);
 
     /* Helper classes. */
     DevI2C *_dev_i2c;
