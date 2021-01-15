@@ -25,13 +25,11 @@
 #include "SWOLogger.h"
 
 #include "BusControl.h"
-#include "FRAM.h"
-#include "Si7051.h"
-#include "LPS22HBSensor.h"
-#include "LSM6DSLSensor.h"
-#include "CapCalc.h"
+#include "Barometer.hpp"
 
 #include "SmartPPEService.h"
+
+
 
 DigitalOut led(LED1);
 BusControl *bus_control = BusControl::get_instance();
@@ -39,8 +37,6 @@ BusControl *bus_control = BusControl::get_instance();
 SWO_Channel SWO; // for SWO logging
 I2C i2c(I2C_SDA0, I2C_SCL0);
 SPI spi(SPI_MOSI, SPI_MISO, SPI_SCK);
-
-CapCalc cap_monitor(VCAP, VCAP_ENABLE, 3000);
 
 SWO_Channel swo("channel");
 
@@ -64,83 +60,51 @@ void led_thread()
     }
 }
 
-
-// /* Schedule processing of events from the BLE middleware in the event queue. */
-// void schedule_ble_events(BLE::OnEventsToProcessCallbackContext *context)
-// {
-//     event_queue.call(Callback<void()>(&context->ble, &BLE::processEvents));
-// }
-
-void sensor_thread(SmartPPEService* smart_ppe_service)
+void sensor_thread(/*SmartPPEService* smart_ppe_service*/)
 {   
     ThisThread::sleep_for(1s);
     bus_control->init();
 
+    bus_control->spi_power(true);
+    Barometer barometer(&spi, BAR_CS, BAR_DRDY);
+    if (!barometer.initialize())
+    {
+        LOG_WARNING("%s", "barometer failed to initialize");
+        while(1) {};
+    }
+
     while(1)
     {
-        bus_control->spi_power(true);
-        ThisThread::sleep_for(10ms);
+        if (barometer.update())
+        {
+            float pressure_data[FIFO_LENGTH];
+            // float temperature_data[FIFO_LENGTH];
 
-        LPS22HBSensor barometer(&spi, BAR_CS);
-        LSM6DSLSensor imu(&spi, IMU_CS);
-        FRAM fram(&spi, FRAM_CS);
-        Si7051 temp(&i2c);
+            barometer.get_pressure_buffer(pressure_data, FIFO_LENGTH);
+            // barometer.get_temperature_buffer(temperature_data, FIFO_LENGTH);
 
-        barometer.init(NULL);
-        barometer.enable();
+            for (int i = 0; i < FIFO_LENGTH; i++)
+            {
+                printf("pressure[%i] = %f\r\n", i, pressure_data[i]/*, i, temperature_data[i]*/);
+            }
+        }
 
-        imu.init(NULL);
-        imu.enable_x();
-
-        ThisThread::sleep_for(100ms);
-
-        float pressure = 0;
-        barometer.get_pressure(&pressure);
-        LOG_DEBUG("pressure = %0.3f mbar", pressure);
-        smart_ppe_service->updatePressure((uint32_t)(pressure*100));
-
-        int32_t data[3] = { 0 };
-        imu.get_x_axes(data);
-        LOG_DEBUG("imu data: x = %li, y = %li, z = %li", data[0], data[1], data[2]);
-
-        bus_control->spi_power(false);
-
-        bus_control->i2c_power(true);
-        ThisThread::sleep_for(100ms);
-
-        temp.initialize();
-        ThisThread::sleep_for(10ms);
-        float temperature = temp.readTemperature();
-        LOG_DEBUG("temperature = %0.3f C", temperature);
-        smart_ppe_service->updateTemperature((uint32_t)(temperature*10000));
-
-        bus_control->i2c_power(false);
-
-        float voltage = cap_monitor.read_capacitor_voltage();
-        LOG_DEBUG("capacitor voltage = %0.3f V", voltage);
-
-        float joules = cap_monitor.calc_joules();
-        LOG_DEBUG("energy = %f J", joules);
-
-        ThisThread::sleep_for(100ms);
     }
 }
 
 int main()
 {
     swo.claim();
-    BLE &ble = BLE::Instance();
-    // ble.onEventsToProcess(schedule_ble_events);
-
-    SmartPPEService smart_ppe_ble;
+    // BLE &ble = BLE::Instance();
+    // SmartPPEService smart_ppe_ble;
 
     thread1.start(led_thread);
-    thread2.start(callback(sensor_thread, &smart_ppe_ble));
+    thread2.start(sensor_thread/*callback(sensor_thread, &smart_ppe_ble)*/);
 
-    GattServerProcess ble_process(event_queue, ble);
-    ble_process.on_init(callback(&smart_ppe_ble, &SmartPPEService::start));
+    // GattServerProcess ble_process(event_queue, ble);
+    // ble_process.on_init(callback(&smart_ppe_ble, &SmartPPEService::start));
 
-    ble_process.start();
+    // ble_process.start();
 
     return 0;
 }

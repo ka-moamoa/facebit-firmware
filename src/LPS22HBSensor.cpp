@@ -89,15 +89,14 @@ int LPS22HBSensor::init(void *init)
     LPS22HB_Set_SpiInterface ((void *)this, LPS22HB_SPI_4_WIRE);
     LPS22HB_Set_I2C ((void *)this, LPS22HB_DISABLE);
   }
-  
 
-  if ( LPS22HB_Set_PowerMode( (void *)this, LPS22HB_LowPower) == LPS22HB_ERROR )
+  /* Power down the device */
+  if ( LPS22HB_Set_Odr( (void *)this, LPS22HB_ODR_ONE_SHOT ) == LPS22HB_ERROR )
   {
     return 1;
   }
 
-  /* Power down the device */
-  if ( LPS22HB_Set_Odr( (void *)this, LPS22HB_ODR_ONE_SHOT ) == LPS22HB_ERROR )
+  if ( LPS22HB_Set_PowerMode( (void *)this, LPS22HB_LowPower) == LPS22HB_ERROR )
   {
     return 1;
   }
@@ -122,6 +121,31 @@ int LPS22HBSensor::init(void *init)
 
   /* Set automatic increment for multi-byte read/write */
   if( LPS22HB_Set_AutomaticIncrementRegAddress( (void *)this, LPS22HB_ENABLE) == LPS22HB_ERROR )
+  {
+    return 1;
+  }
+
+  if (LPS22HB_LatchInterruptRequest((void *)this, LPS22HB_ENABLE) == LPS22HB_ERROR)
+  {
+    return 1;
+  }
+
+  if (LPS22HB_Set_InterruptOutputType((void *)this, LPS22HB_PushPull) == LPS22HB_ERROR)
+  {
+    return 1;
+  }
+
+  if (LPS22HB_Set_InterruptActiveLevel((void*)this, LPS22HB_ActiveHigh) == LPS22HB_ERROR)
+  {
+    return 1;
+  }
+
+  if (LPS22HB_Set_InterruptControlConfig((void*)this, LPS22HB_DATA) == LPS22HB_ERROR)
+  {
+    return 1;
+  }
+
+  if (LPS22HB_Set_DRDYInterrupt((void *)this, LPS22HB_ENABLE))
   {
     return 1;
   }

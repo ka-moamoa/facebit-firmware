@@ -665,7 +665,7 @@ LPS22HB_Error_et LPS22HB_Set_InterruptControlConfig(void *handle, LPS22HB_Output
 
 
 /**
-* @brief   Enable/Disable Data-ready signal on INT_DRDY pin.
+* @brief   Enable/Disable Data-ready signal on INT pin.
 * @param  *handle Device handle.
 * @param  LPS22HB_ENABLE/LPS22HB_DISABLE
 * @retval  Error Code [LPS22HB_ERROR, LPS22HB_OK]
