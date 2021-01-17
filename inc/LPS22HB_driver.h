@@ -1203,6 +1203,8 @@ LPS22HB_Error_et LPS22HB_Get_FifoWatermarkLevel(void *handle, uint8_t *wtmlevel)
 LPS22HB_Error_et LPS22HB_Get_FifoStatus(void *handle, LPS22HB_FifoStatus_st* status);
 
 
+LPS22HB_Error_et LPS22HB_GetCtrlReg2(void *handle, uint8_t *reg2_bits);
+
 /**
 * @brief  Get the reference pressure after soldering for computing differential pressure (hPA)
 * @param buffer to empty with the he pressure value (hPA)

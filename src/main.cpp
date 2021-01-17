@@ -62,7 +62,7 @@ void led_thread()
 
 void sensor_thread(/*SmartPPEService* smart_ppe_service*/)
 {   
-    ThisThread::sleep_for(1s);
+    ThisThread::sleep_for(10ms);
     bus_control->init();
 
     bus_control->spi_power(true);
@@ -78,17 +78,16 @@ void sensor_thread(/*SmartPPEService* smart_ppe_service*/)
         if (barometer.update())
         {
             float pressure_data[FIFO_LENGTH];
-            // float temperature_data[FIFO_LENGTH];
+            float temperature_data[FIFO_LENGTH];
 
             barometer.get_pressure_buffer(pressure_data, FIFO_LENGTH);
-            // barometer.get_temperature_buffer(temperature_data, FIFO_LENGTH);
+            barometer.get_temperature_buffer(temperature_data, FIFO_LENGTH);
 
             for (int i = 0; i < FIFO_LENGTH; i++)
             {
-                printf("pressure[%i] = %f\r\n", i, pressure_data[i]/*, i, temperature_data[i]*/);
+                printf("pressure[%i] = %f, temperature[%i] = %f\r\n", i, pressure_data[i], i, temperature_data[i]);
             }
         }
-
     }
 }
 

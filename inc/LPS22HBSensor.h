@@ -95,6 +95,7 @@ class LPS22HBSensor : public PressureSensor, public TempSensor
     int write_reg(uint8_t reg, uint8_t data);
     int sw_reset(void);
     int enable_fifo(void);
+    int get_fifo_enabled(uint8_t *enabled);
     int enable_fifo_full_interrupt(void);
     int set_interrupt_level(uint8_t intr);
     int enable_fifo_watermark(void);
@@ -103,7 +104,7 @@ class LPS22HBSensor : public PressureSensor, public TempSensor
     int enable_fifo_watermark_interrupt(void);
     int set_fifo_mode(uint8_t mode);
     int get_fifo_mode(uint8_t *mode);
-    int get_fifo_status(uint8_t *status);
+    int get_fifo_status(LPS22HB_FifoStatus_st *status);
     int get_fifo(LPS22HB_Data_st *data);
     int get_pressure_fifo(float *pfData);
     int get_temperature_fifo(float *pfData);

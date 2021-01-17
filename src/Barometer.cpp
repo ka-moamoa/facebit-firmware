@@ -22,11 +22,9 @@ bool Barometer::initialize()
 
     if (_bus_control->get_spi_power() == false)
     {
+        LOG_WARNING("%s", "SPI bus not powered, cannot initialize");
         return false;
     }
-
-    _barometer.reset();
-    _barometer.sw_reset();
 
     if (_barometer.init(NULL) == LPS22HB_ERROR)
     {
@@ -43,7 +41,7 @@ bool Barometer::initialize()
         return false;
     }
 
-    if (_barometer.set_fifo_mode(2) == LPS22HB_ERROR) // Stream mode
+    if (_barometer.set_fifo_mode(1) == LPS22HB_ERROR) // Stream mode
     {
         return false;
     }
@@ -58,14 +56,6 @@ bool Barometer::initialize()
         return false;
     }
 
-    float odr = 255;
-    _barometer.get_odr(&odr);
-    LOG_INFO("odr = %0.2f\r\n", odr);
-
-    uint8_t mode = 255;
-    _barometer.get_fifo_mode(&mode);
-    LOG_INFO("fifo mode = %u\r\n", mode);
-
     _int_pin.rise(callback(this, &Barometer::bar_data_ready));
 
     LOG_DEBUG("%s", "Barometer initialized successfully");
@@ -75,16 +65,15 @@ bool Barometer::initialize()
 
 bool Barometer::update()
 {
+    LPS22HB_FifoStatus_st status;
+    _barometer.get_fifo_status(&status);
+
     // if the interrupt has been triggered, read the data
     if (_bar_data_ready)
     {
-        read_buffered_pressure();
+        read_buffered_data();
         return true;
     }
-
-    uint8_t status = 0;
-    _barometer.get_fifo_status(&status);
-    // LOG_DEBUG("Fifo status = %u", status);
 
     return false;
 }
@@ -153,3 +142,39 @@ void Barometer::bar_data_ready()
     _bar_data_ready = true;
 }
 
+// Purgatory
+
+
+    // if (status.FIFO_EMPTY != _last_fifo_empty && status.FIFO_EMPTY)
+    // {
+    //     LOG_DEBUG("Fifo Empty! = %u", status.FIFO_LEVEL);
+    //     _last_fifo_empty = status.FIFO_EMPTY;
+    // }
+    // if (status.FIFO_FULL != _last_fifo_full && status.FIFO_FULL)
+    // {
+    //     LOG_DEBUG("FIFO full! = %u", status.FIFO_LEVEL);
+    //     _last_fifo_full = status.FIFO_FULL;
+    // }
+    // if (status.FIFO_OVR != _last_fifo_ovr && status.FIFO_OVR)
+    // {
+    //     LOG_DEBUG("FIFO overfull! = %u", status.FIFO_LEVEL);
+    //     _last_fifo_ovr = status.FIFO_OVR;
+    // }
+    // if (status.FIFO_FTH != _last_fifo_fth && status.FIFO_FTH)
+    // {
+    //     LOG_DEBUG("FIFO FTH! = %u", status.FIFO_LEVEL)
+    //     _last_fifo_fth = status.FIFO_FTH;
+    // }
+    // if (status.FIFO_LEVEL != _last_fifo_level)
+    // {
+    //     LOG_DEBUG("FIFO level = %u", status.FIFO_LEVEL);
+    //     _last_fifo_level = status.FIFO_LEVEL;
+    // }
+
+            // uint8_t mode = 255;
+        // _barometer.get_fifo_mode(&mode);
+        // LOG_INFO("fifo mode = %u", mode);
+
+        // uint8_t enabled = 255;
+        // _barometer.get_fifo_enabled(&enabled);
+        // LOG_INFO("fifo enabled = %u", enabled);

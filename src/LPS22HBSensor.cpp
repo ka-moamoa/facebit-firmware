@@ -79,76 +79,11 @@ int LPS22HBSensor::init(void *init)
 {
   _cs_pin = 1;    
 
-  if (_spi_type == SPI3W) 
-  {
-    LPS22HB_Set_SpiInterface ((void *)this, LPS22HB_SPI_3_WIRE);
-    LPS22HB_Set_I2C ((void *)this, LPS22HB_DISABLE);
-  }
-  else if (_spi_type == SPI4W)
-  {
-    LPS22HB_Set_SpiInterface ((void *)this, LPS22HB_SPI_4_WIRE);
-    LPS22HB_Set_I2C ((void *)this, LPS22HB_DISABLE);
-  }
+  LPS22HB_Set_I2C ((void *)this, LPS22HB_DISABLE);
 
-  /* Power down the device */
-  if ( LPS22HB_Set_Odr( (void *)this, LPS22HB_ODR_ONE_SHOT ) == LPS22HB_ERROR )
-  {
-    return 1;
-  }
+  LPS22HB_Init((void *)this);
 
-  if ( LPS22HB_Set_PowerMode( (void *)this, LPS22HB_LowPower) == LPS22HB_ERROR )
-  {
-    return 1;
-  }
-
-  /* Disable low-pass filter on LPS22HB pressure data */
-  if( LPS22HB_Set_LowPassFilter( (void *)this, LPS22HB_DISABLE) == LPS22HB_ERROR )
-  {
-    return 1;
-  }
-
-  /* Set low-pass filter cutoff configuration*/
-  if( LPS22HB_Set_LowPassFilterCutoff( (void *)this, LPS22HB_ODR_9) == LPS22HB_ERROR )
-  {
-    return 1;
-  }
-
-  /* Set block data update mode */
-  if ( LPS22HB_Set_Bdu( (void *)this, LPS22HB_BDU_NO_UPDATE ) == LPS22HB_ERROR )
-  {
-    return 1;
-  }
-
-  /* Set automatic increment for multi-byte read/write */
-  if( LPS22HB_Set_AutomaticIncrementRegAddress( (void *)this, LPS22HB_ENABLE) == LPS22HB_ERROR )
-  {
-    return 1;
-  }
-
-  if (LPS22HB_LatchInterruptRequest((void *)this, LPS22HB_ENABLE) == LPS22HB_ERROR)
-  {
-    return 1;
-  }
-
-  if (LPS22HB_Set_InterruptOutputType((void *)this, LPS22HB_PushPull) == LPS22HB_ERROR)
-  {
-    return 1;
-  }
-
-  if (LPS22HB_Set_InterruptActiveLevel((void*)this, LPS22HB_ActiveHigh) == LPS22HB_ERROR)
-  {
-    return 1;
-  }
-
-  if (LPS22HB_Set_InterruptControlConfig((void*)this, LPS22HB_DATA) == LPS22HB_ERROR)
-  {
-    return 1;
-  }
-
-  if (LPS22HB_Set_DRDYInterrupt((void *)this, LPS22HB_ENABLE))
-  {
-    return 1;
-  }
+  // LPS22HB_Set_I2C((void *)this, LPS22HB_DISABLE);
 
   _is_enabled = 0;
   _last_odr = 25.0f;
@@ -459,6 +394,18 @@ int LPS22HBSensor::enable_fifo(void)
   return 0;
 }
 
+int LPS22HBSensor::get_fifo_enabled(uint8_t *enabled)
+{
+  uint8_t tmp;
+  if (LPS22HB_GetCtrlReg2((void *)this, &tmp) == LPS22HB_ERROR)
+  {
+    return 1;
+  }
+
+  *enabled = (uint8_t)((tmp & LPS22HB_FIFO_EN_MASK)>>LPS22HB_FIFO_EN_BIT);
+
+  return 0;
+}
 
 /**
  * @brief  Enable LPS22HB full interrupt
@@ -612,14 +559,14 @@ int LPS22HBSensor::set_fifo_mode(uint8_t mode)
  * @param  the pointer to the FIFO status register
  * @retval 0 in case of success, an error code otherwise
  */
-int LPS22HBSensor::get_fifo_status(uint8_t *status)
+int LPS22HBSensor::get_fifo_status(LPS22HB_FifoStatus_st *status)
 {
   LPS22HB_FifoStatus_st new_status;
   if(LPS22HB_Get_FifoStatus( (void *)this, &new_status) == LPS22HB_ERROR)
   {
     return 1;
   }
-  *status = new_status.FIFO_LEVEL;
+  *status = new_status;
   return 0;
 }
 
@@ -669,21 +616,39 @@ int LPS22HBSensor::get_pressure_fifo(float *pfData)
 
 int LPS22HBSensor::get_fifo(LPS22HB_Data_st *data)
 {
-    float tmp_pressure[FIFO_LENGTH], tmp_temperature[FIFO_LENGTH] = {0};
-    if ( get_pressure_fifo(tmp_pressure) == 1)
+    // float tmp_pressure[FIFO_LENGTH], tmp_temperature[FIFO_LENGTH] = {0};
+    for (int i = 0; i < FIFO_LENGTH; i++)
     {
-      return 1;
+      int32_t pressure_data = 0;
+      if (LPS22HB_Get_Pressure((void *)this, &pressure_data) == LPS22HB_ERROR)
+      {
+        return 1;
+      }
+
+      data[i].pressure = (float)pressure_data / 100.0f;
+
+      int16_t temp_data = 0;
+      if (LPS22HB_Get_Temperature((void *)this, &temp_data) == LPS22HB_ERROR)
+      {
+        return 1;
+      }
+
+      data[i].temperature = (float)temp_data / 100.0f;
     }
-    if ( get_temperature_fifo(tmp_temperature) == 1)
-    {
-      return 1;
-    }
-    uint8_t i = 0;
-    for(i=0; i<FIFO_LENGTH; i++)
-    {
-        data[i].temperature = tmp_temperature[i];
-        data[i].pressure = tmp_pressure[i];
-    }
+    // if ( get_pressure_fifo(tmp_pressure) == 1)
+    // {
+    //   return 1;
+    // }
+    // if ( get_temperature_fifo(tmp_temperature) == 1)
+    // {
+    //   return 1;
+    // }
+    // uint8_t i = 0;
+    // for(i=0; i<FIFO_LENGTH; i++)
+    // {
+    //     data[i].temperature = tmp_temperature[i];
+    //     data[i].pressure = tmp_pressure[i];
+    // }
     return 0;
 }
 

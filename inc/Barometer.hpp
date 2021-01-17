@@ -27,7 +27,6 @@ private:
     LPS22HBSensor _barometer;
     InterruptIn _int_pin;
 
-    uint8_t last_fifo_status;
 
     void bar_data_ready();
     bool read_buffered_data();
