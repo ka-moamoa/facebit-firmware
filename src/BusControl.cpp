@@ -63,6 +63,10 @@ void BusControl::spi_power(bool power)
     _bar_cs = power;
     _mag_cs = power;
     _imu_cs = power;
+
+    ThisThread::sleep_for(10ms); // give enough time for the devices to power up properly
+
+    _spi_power = power;
 }
 
 
@@ -77,4 +81,16 @@ void BusControl::i2c_power(bool power)
     _temp_vcc = power;
     _voc_vcc = power;
     _i2c_pu = power;
+
+    _i2c_power = power;
+}
+
+bool BusControl::get_spi_power()
+{
+    return _spi_power;
+}
+
+bool BusControl::get_i2c_power()
+{
+    return _i2c_power;
 }

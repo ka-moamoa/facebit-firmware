@@ -665,7 +665,7 @@ LPS22HB_Error_et LPS22HB_Set_InterruptControlConfig(void *handle, LPS22HB_Output
 
 
 /**
-* @brief   Enable/Disable Data-ready signal on INT_DRDY pin.
+* @brief   Enable/Disable Data-ready signal on INT pin.
 * @param  *handle Device handle.
 * @param  LPS22HB_ENABLE/LPS22HB_DISABLE
 * @retval  Error Code [LPS22HB_ERROR, LPS22HB_OK]
@@ -1033,8 +1033,14 @@ LPS22HB_Error_et LPS22HB_Get_RawPressure(void *handle, int32_t *raw_press)
   uint32_t tmp = 0;
   uint8_t i;
 
-  if(LPS22HB_read_reg(handle, LPS22HB_PRESS_OUT_XL_REG, 3, buffer))
+  if(LPS22HB_read_reg(handle, LPS22HB_PRESS_OUT_XL_REG, 1, &buffer[0]))
     return LPS22HB_ERROR;
+
+  if(LPS22HB_read_reg(handle, LPS22HB_PRESS_OUT_L_REG, 1, &buffer[1]))
+    return LPS22HB_ERROR;
+
+  if(LPS22HB_read_reg(handle, LPS22HB_PRESS_OUT_H_REG, 1, &buffer[2]))
+    return LPS22HB_ERROR; 
 
   /* Build the raw data */
   for(i=0; i<3; i++)
@@ -1082,7 +1088,10 @@ LPS22HB_Error_et LPS22HB_Get_RawTemperature(void *handle, int16_t* raw_data)
   uint8_t buffer[2];
   uint16_t tmp;
 
-  if(LPS22HB_read_reg(handle, LPS22HB_TEMP_OUT_L_REG, 2, buffer))
+  if(LPS22HB_read_reg(handle, LPS22HB_TEMP_OUT_L_REG, 1, &buffer[0]))
+    return LPS22HB_ERROR;
+
+  if(LPS22HB_read_reg(handle, LPS22HBH_TEMP_OUT_H_REG, 1, &buffer[1]))
     return LPS22HB_ERROR;
 
   /* Build the raw tmp */
@@ -1386,12 +1395,12 @@ LPS22HB_Error_et LPS22HB_Init(void *handle)
   if(LPS22HB_SwResetAndMemoryBoot(handle))
     return LPS22HB_ERROR;
 
- pLPS22HBInit.PowerMode=LPS22HB_LowPower;
- pLPS22HBInit.OutputDataRate=LPS22HB_ODR_25HZ;
+ pLPS22HBInit.PowerMode=LPS22HB_LowNoise;
+ pLPS22HBInit.OutputDataRate=LPS22HB_ODR_ONE_SHOT;
  pLPS22HBInit.LowPassFilter=LPS22HB_DISABLE;
  pLPS22HBInit.LPF_Cutoff=LPS22HB_ODR_9;
  pLPS22HBInit.BDU=LPS22HB_BDU_NO_UPDATE;
- pLPS22HBInit.IfAddInc=LPS22HB_ENABLE; //default
+ pLPS22HBInit.IfAddInc=LPS22HB_DISABLE; //default
  pLPS22HBInit.Sim= LPS22HB_SPI_4_WIRE;
 
  /* Set Generic Configuration*/
@@ -1648,6 +1657,19 @@ LPS22HB_Error_et LPS22HB_Get_InterruptConfig(void *handle, LPS22HB_InterruptType
   //AutoRifP and Autozero are self clear //
   pLPS22HBInt->AutoRifP=LPS22HB_DISABLE;
   pLPS22HBInt->AutoZero=LPS22HB_DISABLE;
+
+  return LPS22HB_OK;
+}
+
+LPS22HB_Error_et LPS22HB_GetCtrlReg2(void *handle, uint8_t *reg2_bits)
+{
+  uint8_t tmp;
+  if (LPS22HB_read_reg(handle, LPS22HB_CTRL_REG2, 1, &tmp))
+  {
+    return LPS22HB_ERROR;
+  }
+
+  *reg2_bits = tmp;
 
   return LPS22HB_OK;
 }
