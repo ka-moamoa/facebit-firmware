@@ -31,7 +31,7 @@ bool Barometer::initialize()
         return false;
     }
 
-    if (_barometer.set_odr(10.0) == LPS22HB_ERROR)
+    if (_barometer.set_odr(25.0) == LPS22HB_ERROR)
     {
         return false;
     }
@@ -41,12 +41,7 @@ bool Barometer::initialize()
         return false;
     }
 
-    if (_barometer.set_fifo_mode(1) == LPS22HB_ERROR) // Stream mode
-    {
-        return false;
-    }
-
-    if (_barometer.enable_fifo_full_interrupt() == LPS22HB_ERROR)
+    if (_barometer.set_fifo_mode(3) == LPS22HB_ERROR) // Stream-to-fifo mode
     {
         return false;
     }
@@ -63,14 +58,28 @@ bool Barometer::initialize()
     return true;
 }
 
+bool Barometer::set_fifo_full_interrupt(bool enable)
+{
+    if (_barometer.fifo_full_interrupt(enable) == LPS22HB_ERROR)
+    {
+        return false;
+    }
+    
+    return true;
+}
+
 bool Barometer::update()
 {
-    LPS22HB_FifoStatus_st status;
-    _barometer.get_fifo_status(&status);
-
     // if the interrupt has been triggered, read the data
     if (_bar_data_ready)
     {
+        LPS22HB_InterruptDiffStatus_st interrupt_source;
+        _barometer.get_interrupt_status(&interrupt_source);
+        if (interrupt_source.PH)
+        {
+            _high_pressure_event_flag = true;
+        }
+
         read_buffered_data();
         return true;
     }
@@ -124,16 +133,23 @@ bool Barometer::read_buffered_data()
     return true;
 }
 
-bool Barometer::read_buffered_pressure()
+bool Barometer::enable_pressure_threshold(bool enable, bool high_pressure, bool low_pressure)
 {
-    if (_barometer.get_pressure_fifo(_pressure_buffer) == LPS22HB_ERROR)
+    if (_barometer.differential_interrupt(enable, high_pressure, low_pressure) == LPS22HB_ERROR)
     {
-        LOG_WARNING("%s", "Unable to read pressure data from fifo");
         return false;
     }
 
-    _unread_pressure_data = true;
-    _bar_data_ready = true;
+    return true;
+}
+
+bool Barometer::set_pressure_threshold(int16_t hPa)
+{
+    if (_barometer.set_interrupt_pressure(hPa) == LPS22HB_ERROR)
+    {
+        return false;
+    }
+
     return true;
 }
 

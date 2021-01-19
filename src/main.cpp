@@ -60,6 +60,14 @@ void led_thread()
     }
 }
 
+void process_data(float *pressure_data)
+{
+    for (int i = 0; i < FIFO_LENGTH; i++)
+    {
+        LOG_INFO("pressure[%i] = %0.2f", i, pressure_data[i]);
+    }
+}
+
 void sensor_thread(/*SmartPPEService* smart_ppe_service*/)
 {   
     ThisThread::sleep_for(10ms);
@@ -67,28 +75,38 @@ void sensor_thread(/*SmartPPEService* smart_ppe_service*/)
 
     bus_control->spi_power(true);
     Barometer barometer(&spi, BAR_CS, BAR_DRDY);
-    if (!barometer.initialize())
+    
+    if (!barometer.initialize() || !barometer.set_fifo_full_interrupt(true))
     {
         LOG_WARNING("%s", "barometer failed to initialize");
         while(1) {};
     }
 
+    if (!barometer.set_pressure_threshold(980) || !barometer.enable_pressure_threshold(true, true, false))
+    {
+        LOG_WARNING("%s", "barometer setup failed");
+        while(1) {};
+    }
+    
+
     while(1)
     {
         if (barometer.update())
         {
+            if (barometer.get_high_pressure_event_flag())
+            {
+                LOG_INFO("%s", "High pressure event detected!");
+            }
             float pressure_data[FIFO_LENGTH];
             float temperature_data[FIFO_LENGTH];
 
             barometer.get_pressure_buffer(pressure_data, FIFO_LENGTH);
             barometer.get_temperature_buffer(temperature_data, FIFO_LENGTH);
 
-            for (int i = 0; i < FIFO_LENGTH; i++)
-            {
-                printf("pressure[%i] = %f, temperature[%i] = %f\r\n", i, pressure_data[i], i, temperature_data[i]);
-            }
+            process_data(pressure_data);
         }
     }
+    ThisThread::sleep_for(1ms);
 }
 
 int main()

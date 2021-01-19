@@ -411,9 +411,9 @@ int LPS22HBSensor::get_fifo_enabled(uint8_t *enabled)
  * @brief  Enable LPS22HB full interrupt
  * @retval 0 in case of success, an error code otherwise
  */
-int LPS22HBSensor::enable_fifo_full_interrupt(void)
+int LPS22HBSensor::fifo_full_interrupt(bool enable)
 {
-  if(LPS22HB_Set_FIFO_FULL_Interrupt( (void *)this, LPS22HB_ENABLE) == LPS22HB_ERROR)
+  if(LPS22HB_Set_FIFO_FULL_Interrupt( (void *)this, enable ? LPS22HB_ENABLE : LPS22HB_DISABLE) == LPS22HB_ERROR)
   {
     return 1;
   }
@@ -650,6 +650,46 @@ int LPS22HBSensor::get_fifo(LPS22HB_Data_st *data)
     //     data[i].pressure = tmp_pressure[i];
     // }
     return 0;
+}
+
+int LPS22HBSensor::differential_interrupt(bool enable, bool high_pressure, bool low_pressure)
+{
+  if (LPS22HB_Set_InterruptDifferentialGeneration((void *)this, enable ? LPS22HB_ENABLE : LPS22HB_DISABLE) == LPS22HB_ERROR)
+  {
+    return 1;
+  }
+
+  if (LPS22HB_Set_PHE((void *)this, high_pressure ? LPS22HB_ENABLE : LPS22HB_DISABLE) == LPS22HB_ERROR)
+  {
+    return 1;
+  }
+
+  if (LPS22HB_Set_PLE((void *)this, low_pressure ? LPS22HB_ENABLE : LPS22HB_DISABLE) == LPS22HB_ERROR)
+  {
+    return 1;
+  }
+
+  return 0;
+}
+
+int LPS22HBSensor::set_interrupt_pressure(int16_t hPa)
+{
+  if (LPS22HB_Set_PressureThreshold((void *)this, hPa) == LPS22HB_ERROR)
+  {
+    return 1;
+  }
+
+  return 0;
+}
+
+int LPS22HBSensor::get_interrupt_status(LPS22HB_InterruptDiffStatus_st *int_source)
+{
+  if (LPS22HB_Get_InterruptDifferentialEventStatus((void *)this, int_source))
+  {
+    return 1;
+  }
+
+  return 0;
 }
 
 uint8_t LPS22HB_io_write( void *handle, uint8_t WriteAddr, uint8_t *pBuffer, uint16_t nBytesToWrite )
