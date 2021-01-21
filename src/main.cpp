@@ -29,7 +29,7 @@
 
 #include "SmartPPEService.h"
 
-
+#define BUFFER_SIZE 100
 
 DigitalOut led(LED1);
 BusControl *bus_control = BusControl::get_instance();
@@ -62,13 +62,13 @@ void led_thread()
 
 void process_data(float *pressure_data)
 {
-    for (int i = 0; i < FIFO_LENGTH; i++)
-    {
-        LOG_INFO("pressure[%i] = %0.2f", i, pressure_data[i]);
-    }
+    // for (int i = 0; i < FIFO_LENGTH; i++)
+    // {
+    //     LOG_INFO("pressure[%i] = %0.2f", i, pressure_data[i]);
+    // }
 }
 
-void sensor_thread(/*SmartPPEService* smart_ppe_service*/)
+void sensor_thread(SmartPPEService* smart_ppe_service)
 {   
     ThisThread::sleep_for(10ms);
     bus_control->init();
@@ -82,7 +82,7 @@ void sensor_thread(/*SmartPPEService* smart_ppe_service*/)
         while(1) {};
     }
 
-    if (!barometer.set_pressure_threshold(980) || !barometer.enable_pressure_threshold(true, true, false))
+    if (!barometer.set_pressure_threshold(1010) || !barometer.enable_pressure_threshold(true, true, false))
     {
         LOG_WARNING("%s", "barometer setup failed");
         while(1) {};
@@ -97,31 +97,36 @@ void sensor_thread(/*SmartPPEService* smart_ppe_service*/)
             {
                 LOG_INFO("%s", "High pressure event detected!");
             }
-            float pressure_data[FIFO_LENGTH];
-            float temperature_data[FIFO_LENGTH];
 
-            barometer.get_pressure_buffer(pressure_data, FIFO_LENGTH);
-            barometer.get_temperature_buffer(temperature_data, FIFO_LENGTH);
+            if (barometer.get_pressure_buffer_size() > BUFFER_SIZE)
+            {
+                LOG_DEBUG("%s", "pressure_buffer full!");
 
-            process_data(pressure_data);
+                for (uint16_t i = 0; i < barometer.get_pressure_buffer_size(); i++)
+                {
+                    smart_ppe_service->updatePressure(barometer.get_pressure_buffer_element());
+                    smart_ppe_service->updatePressure(barometer.get_temp_buffer_element());
+                }
+            }
         }
     }
+
     ThisThread::sleep_for(1ms);
 }
 
 int main()
 {
     swo.claim();
-    // BLE &ble = BLE::Instance();
-    // SmartPPEService smart_ppe_ble;
+    BLE &ble = BLE::Instance();
+    SmartPPEService smart_ppe_ble;
 
     thread1.start(led_thread);
-    thread2.start(sensor_thread/*callback(sensor_thread, &smart_ppe_ble)*/);
+    thread2.start(callback(sensor_thread, &smart_ppe_ble));
 
-    // GattServerProcess ble_process(event_queue, ble);
-    // ble_process.on_init(callback(&smart_ppe_ble, &SmartPPEService::start));
+    GattServerProcess ble_process(event_queue, ble);
+    ble_process.on_init(callback(&smart_ppe_ble, &SmartPPEService::start));
 
-    // ble_process.start();
+    ble_process.start();
 
     return 0;
 }

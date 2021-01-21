@@ -614,42 +614,28 @@ int LPS22HBSensor::get_pressure_fifo(float *pfData)
   return 0;
 }
 
-int LPS22HBSensor::get_fifo(LPS22HB_Data_st *data)
+int LPS22HBSensor::get_fifo(std::queue<uint32_t> &pressure_buffer, std::queue<uint32_t> &temperature_buffer)
 {
-    // float tmp_pressure[FIFO_LENGTH], tmp_temperature[FIFO_LENGTH] = {0};
-    for (int i = 0; i < FIFO_LENGTH; i++)
+  for (int i = 0; i < FIFO_LENGTH; i++)
+  {
+    int32_t pressure_data = 0;
+    if (LPS22HB_Get_Pressure((void *)this, &pressure_data) == LPS22HB_ERROR)
     {
-      int32_t pressure_data = 0;
-      if (LPS22HB_Get_Pressure((void *)this, &pressure_data) == LPS22HB_ERROR)
-      {
-        return 1;
-      }
-
-      data[i].pressure = (float)pressure_data / 100.0f;
-
-      int16_t temp_data = 0;
-      if (LPS22HB_Get_Temperature((void *)this, &temp_data) == LPS22HB_ERROR)
-      {
-        return 1;
-      }
-
-      data[i].temperature = (float)temp_data / 100.0f;
+      return 1;
     }
-    // if ( get_pressure_fifo(tmp_pressure) == 1)
-    // {
-    //   return 1;
-    // }
-    // if ( get_temperature_fifo(tmp_temperature) == 1)
-    // {
-    //   return 1;
-    // }
-    // uint8_t i = 0;
-    // for(i=0; i<FIFO_LENGTH; i++)
-    // {
-    //     data[i].temperature = tmp_temperature[i];
-    //     data[i].pressure = tmp_pressure[i];
-    // }
-    return 0;
+
+    pressure_buffer.push(pressure_data);
+
+    int16_t temp_data = 0;
+    if (LPS22HB_Get_Temperature((void *)this, &temp_data) == LPS22HB_ERROR)
+    {
+      return 1;
+    }
+
+    temperature_buffer.push(temp_data);
+  }
+  
+  return 0;
 }
 
 int LPS22HBSensor::differential_interrupt(bool enable, bool high_pressure, bool low_pressure)

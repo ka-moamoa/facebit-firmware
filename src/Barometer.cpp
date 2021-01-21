@@ -73,6 +73,14 @@ bool Barometer::update()
     // if the interrupt has been triggered, read the data
     if (_bar_data_ready)
     {
+        LPS22HB_FifoStatus_st fifo_status;
+        _barometer.get_fifo_status(&fifo_status);
+        if (!fifo_status.FIFO_FULL)
+        {
+            LOG_DEBUG("%s", "FIFO not full, but interrupt triggered");
+            return false;
+        }
+
         LPS22HB_InterruptDiffStatus_st interrupt_source;
         _barometer.get_interrupt_status(&interrupt_source);
         if (interrupt_source.PH)
@@ -80,57 +88,15 @@ bool Barometer::update()
             _high_pressure_event_flag = true;
         }
 
-        read_buffered_data();
+        if (!read_buffered_data())
+        {
+            return false;
+        }
+        
         return true;
     }
 
     return false;
-}
-
-void Barometer::get_pressure_buffer(float *pressure_data, uint8_t num_elements)
-{
-    if (num_elements > FIFO_LENGTH)
-    {
-        LOG_WARNING("Can only return up to %u elements", FIFO_LENGTH)
-        return;
-    }
-
-    for (int i = 0; i < num_elements; i++)
-    {
-        pressure_data[i] = _lps22hbData[i].pressure;
-    }
-
-    _unread_pressure_data = false;
-}
-
-void Barometer::get_temperature_buffer(float *temp_data, uint8_t num_elements)
-{
-    if (num_elements > FIFO_LENGTH)
-    {
-        LOG_WARNING("Can only return up to %u elements", FIFO_LENGTH);
-        return;
-    }
-
-    for (int i = 0; i < num_elements; i++)
-    {
-        temp_data[i] = _lps22hbData[i].temperature;
-    }
-
-    _unread_temperature_data = false;
-}
-
-bool Barometer::read_buffered_data()
-{
-    if (_barometer.get_fifo(_lps22hbData) == LPS22HB_ERROR)
-    {
-        LOG_WARNING("%s", "Unable to read barometer data");
-        return false;
-    }
-
-    _unread_pressure_data = true;
-    _unread_temperature_data = true;
-    _bar_data_ready = false;
-    return true;
 }
 
 bool Barometer::enable_pressure_threshold(bool enable, bool high_pressure, bool low_pressure)
@@ -156,6 +122,32 @@ bool Barometer::set_pressure_threshold(int16_t hPa)
 void Barometer::bar_data_ready()
 {
     _bar_data_ready = true;
+}
+
+uint32_t Barometer::get_pressure_buffer_element()
+{
+    uint32_t val = _pressure_buffer.front();
+    _pressure_buffer.pop();
+    return val;
+}
+
+uint32_t Barometer::get_temp_buffer_element()
+{
+    uint32_t val = _temperature_buffer.front();
+    _temperature_buffer.pop();
+    return val;
+}
+
+bool Barometer::read_buffered_data()
+{
+    if (_barometer.get_fifo(_pressure_buffer, _temperature_buffer) == LPS22HB_ERROR)
+    {
+        LOG_WARNING("%s", "Unable to read barometer data");
+        return false;
+    }
+
+    _bar_data_ready = false;
+    return true;
 }
 
 // Purgatory
