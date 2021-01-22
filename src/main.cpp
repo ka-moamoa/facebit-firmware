@@ -29,7 +29,7 @@
 
 #include "SmartPPEService.h"
 
-#define BUFFER_SIZE 100
+#define BUFFER_SIZE 50
 
 DigitalOut led(LED1);
 BusControl *bus_control = BusControl::get_instance();
@@ -46,7 +46,7 @@ const static char DEVICE_NAME[] = "SMARTPPE";
 
 static events::EventQueue event_queue(/* event count */ 16 * EVENTS_EVENT_SIZE);
 
-Thread thread1;
+Thread thread1(osPriorityNormal, 256);
 Thread thread2;
 
 void led_thread()
