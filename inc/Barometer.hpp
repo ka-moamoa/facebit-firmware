@@ -29,6 +29,7 @@ public:
     uint16_t get_temp_buffer_size() { return _temperature_buffer.size(); };
     uint16_t* get_pressure_array() { return _pressure_buffer.data(); };
     uint16_t* get_temperature_array() { return _temperature_buffer.data(); };
+    void clear_buffers() { _temperature_buffer.clear(); _pressure_buffer.clear(); };
 private:
     bool _initialized = false;
     bool _bar_data_ready = false;

@@ -102,6 +102,7 @@ void sensor_thread(SmartPPEService* smart_ppe_service)
                 smart_ppe_service->updatePressure(barometer.get_pressure_array(), barometer.get_pressure_buffer_size());
                 smart_ppe_service->updateTemperature(barometer.get_temperature_array(), barometer.get_temp_buffer_size());
                 smart_ppe_service->updateDataReady(true);
+                barometer.clear_buffers();
             }
         }
     }
