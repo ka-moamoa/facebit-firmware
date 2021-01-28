@@ -614,7 +614,7 @@ int LPS22HBSensor::get_pressure_fifo(float *pfData)
   return 0;
 }
 
-int LPS22HBSensor::get_fifo(std::queue<uint32_t> &pressure_buffer, std::queue<uint32_t> &temperature_buffer)
+int LPS22HBSensor::get_fifo(std::vector<uint16_t> &pressure_buffer, std::vector<uint16_t> &temperature_buffer)
 {
   for (int i = 0; i < FIFO_LENGTH; i++)
   {
@@ -624,7 +624,7 @@ int LPS22HBSensor::get_fifo(std::queue<uint32_t> &pressure_buffer, std::queue<ui
       return 1;
     }
 
-    pressure_buffer.push(pressure_data);
+    pressure_buffer.push_back(pressure_data);
 
     int16_t temp_data = 0;
     if (LPS22HB_Get_Temperature((void *)this, &temp_data) == LPS22HB_ERROR)
@@ -632,7 +632,7 @@ int LPS22HBSensor::get_fifo(std::queue<uint32_t> &pressure_buffer, std::queue<ui
       return 1;
     }
 
-    temperature_buffer.push(temp_data);
+    temperature_buffer.push_back(temp_data);
   }
   
   return 0;

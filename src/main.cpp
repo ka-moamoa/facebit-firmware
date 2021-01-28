@@ -29,7 +29,7 @@
 
 #include "SmartPPEService.h"
 
-#define MAX_BUFFER_SIZE 50
+#define MAX_BUFFER_SIZE 100
 
 DigitalOut led(LED1);
 BusControl *bus_control = BusControl::get_instance();
@@ -102,15 +102,9 @@ void sensor_thread(SmartPPEService* smart_ppe_service)
             if (buffer_size > MAX_BUFFER_SIZE)
             {
                 LOG_DEBUG("pressure_buffer full! %u elements", buffer_size);
-
-                for (uint16_t i = 0; i < buffer_size; i++)
-                {
-                    uint32_t val = barometer.get_pressure_buffer_element();
-                    LOG_INFO("Sending item %u %lu", i, val);
-                    smart_ppe_service->updatePressure(val);
-                    smart_ppe_service->updateTemperature(barometer.get_temp_buffer_element());
-                    ThisThread::sleep_for(1ms);
-                }
+                smart_ppe_service->updatePressure(barometer.get_pressure_array(), barometer.get_pressure_buffer_size());
+                smart_ppe_service->updateTemperature(barometer.get_temperature_array(), barometer.get_temp_buffer_size());
+                smart_ppe_service->updateDataReady(true);
             }
         }
     }

@@ -51,7 +51,6 @@
 #include <assert.h>
 #include <queue>
 
-
 #define FIFO_LENGTH (uint8_t)32
 /* Data Types -------------------------------------------------------------*/
 /** @defgroup LPS22HB_Data_Types
@@ -106,7 +105,7 @@ class LPS22HBSensor : public PressureSensor, public TempSensor
     int set_fifo_mode(uint8_t mode);
     int get_fifo_mode(uint8_t *mode);
     int get_fifo_status(LPS22HB_FifoStatus_st *status);
-    int get_fifo(std::queue<uint32_t> &pressure_buffer, std::queue<uint32_t> &temperature_buffer);
+    int get_fifo(std::vector<uint16_t> &pressure_buffer, std::vector<uint16_t> &temperature_buffer);
     int get_pressure_fifo(float *pfData);
     int get_temperature_fifo(float *pfData);
     int differential_interrupt(bool enable, bool high_pressure, bool low_pressure);

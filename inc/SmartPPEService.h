@@ -24,12 +24,12 @@ public:
         const UUID imu_uuid(IMU_UUID);
         const UUID mic_uuid(MICROPHONE_UUID);
 
-        _pressure_characteristic = new ReadOnlyGattCharacteristic<uint32_t> (pressure_uuid, &_initial_value_uint32_t,  GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_NOTIFY);
+        _pressure_characteristic = new ReadOnlyArrayGattCharacteristic<uint16_t, 100> (pressure_uuid, &_initial_value_uint16_t);
         if (!_pressure_characteristic) {
             printf("Allocation of pressure characteristic failed\r\n");
         }
 
-        _temperature_characteristic = new ReadOnlyGattCharacteristic<uint32_t> (temp_uuid, &_initial_value_uint32_t, GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_NOTIFY);
+        _temperature_characteristic = new ReadOnlyArrayGattCharacteristic<uint16_t, 100> (temp_uuid, &_initial_value_uint16_t);
         if (!_temperature_characteristic) {
             printf("Allocation of temperature characteristic failed\r\n");
         }
@@ -80,33 +80,27 @@ public:
         printf("Example service added with UUID 6243fabc-23e9-4b79-bd30-1dc57b8005d6\r\n");
     }
 
-    void updatePressure(uint32_t pressurex100)
+    void updatePressure(uint16_t *pressure_array, uint16_t size)
     {
-        const uint8_t pressure_array[4] = {
-            (uint8_t)((pressurex100 >>24) & 0xFF),
-            (uint8_t)((pressurex100 >>16) & 0xFF),
-            (uint8_t)((pressurex100 >>8) & 0xFF),
-            (uint8_t)((pressurex100) & 0xFF) };
-
-        _server->write(_pressure_characteristic->getValueHandle(), pressure_array, 4);
+        _server->write(_pressure_characteristic->getValueHandle(), (uint8_t*)pressure_array, size);
     }
 
-    void updateTemperature(uint32_t temperaturex10000)
+    void updateTemperature(uint16_t *temperature_array, uint16_t size)
     {
-        const uint8_t temp_array[4] = {
-            (uint8_t)((temperaturex10000 >>24) & 0xFF),
-            (uint8_t)((temperaturex10000 >>16) & 0xFF),
-            (uint8_t)((temperaturex10000 >>8) & 0xFF),
-            (uint8_t)((temperaturex10000) & 0xFF) };
+        _server->write(_temperature_characteristic->getValueHandle(), (uint8_t*)temperature_array, size);
+    }
 
-        _server->write(_temperature_characteristic->getValueHandle(), temp_array, 4);
+    void updateDataReady(bool ready)
+    {
+        uint8_t tmp = ready;
+        _server->write(_air_quality_characteristic->getValueHandle(), &tmp, 1);
     }
 
 private:
     GattServer* _server = nullptr;
 
-    ReadOnlyGattCharacteristic<uint32_t>* _pressure_characteristic = nullptr;
-    ReadOnlyGattCharacteristic<uint32_t>* _temperature_characteristic = nullptr;
+    ReadOnlyArrayGattCharacteristic<uint16_t, 100>* _pressure_characteristic = nullptr;
+    ReadOnlyArrayGattCharacteristic<uint16_t, 100>* _temperature_characteristic = nullptr;
     ReadOnlyGattCharacteristic<uint16_t>* _air_quality_characteristic = nullptr;
     ReadOnlyGattCharacteristic<uint16_t>* _imu_characteristic = nullptr;
     ReadOnlyGattCharacteristic<uint16_t>* _mag_characteristic = nullptr;

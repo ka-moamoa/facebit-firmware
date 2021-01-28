@@ -21,16 +21,16 @@ public:
 
     bool get_high_pressure_event_flag() { return _high_pressure_event_flag; };
 
-    uint32_t get_pressure_buffer_element();
-    uint32_t get_temp_buffer_element();
     uint16_t get_pressure_buffer_size() { return _pressure_buffer.size(); };
     uint16_t get_temp_buffer_size() { return _temperature_buffer.size(); };
+    uint16_t* get_pressure_array() { return _pressure_buffer.data(); };
+    uint16_t* get_temperature_array() { return _temperature_buffer.data(); };
 private:
     bool _initialized = false;
     bool _bar_data_ready = false;
     LPS22HB_Data_st _lps22hbData[FIFO_LENGTH] = {{0}, {0}};
-    std::queue<uint32_t> _pressure_buffer;
-    std::queue<uint32_t> _temperature_buffer;
+    std::vector<uint16_t> _pressure_buffer;
+    std::vector<uint16_t> _temperature_buffer;
     bool _high_pressure_event_flag = false;
 
     BusControl *_bus_control;

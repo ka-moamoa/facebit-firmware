@@ -124,19 +124,7 @@ void Barometer::bar_data_ready()
     _bar_data_ready = true;
 }
 
-uint32_t Barometer::get_pressure_buffer_element()
-{
-    uint32_t val = _pressure_buffer.front();
-    _pressure_buffer.pop();
-    return val;
-}
 
-uint32_t Barometer::get_temp_buffer_element()
-{
-    uint32_t val = _temperature_buffer.front();
-    _temperature_buffer.pop();
-    return val;
-}
 
 bool Barometer::read_buffered_data()
 {
