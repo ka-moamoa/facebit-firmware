@@ -124,8 +124,6 @@ void Barometer::bar_data_ready()
     _bar_data_ready = true;
 }
 
-
-
 bool Barometer::read_buffered_data()
 {
     if (_barometer.get_fifo(_pressure_buffer, _temperature_buffer) == LPS22HB_ERROR)
@@ -134,12 +132,28 @@ bool Barometer::read_buffered_data()
         return false;
     }
 
+    if (_pressure_buffer.size() > _max_buffer_size)
+    {
+        uint8_t elements_to_delete = _pressure_buffer.size() - _max_buffer_size;
+        _pressure_buffer.erase(_pressure_buffer.begin(), _pressure_buffer.begin()+elements_to_delete);
+    }
+
+    if (_temperature_buffer.size() > _max_buffer_size)
+    {
+        uint8_t elements_to_delete = _temperature_buffer.size() - _max_buffer_size;
+        _temperature_buffer.erase(_temperature_buffer.begin(), _temperature_buffer.begin()+elements_to_delete);
+    }
+
     _bar_data_ready = false;
     return true;
 }
 
-// Purgatory
+void Barometer::set_max_buffer_size(uint16_t size)
+{
+    _max_buffer_size = size;
+}
 
+// Purgatory
 
     // if (status.FIFO_EMPTY != _last_fifo_empty && status.FIFO_EMPTY)
     // {

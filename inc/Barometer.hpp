@@ -21,6 +21,10 @@ public:
 
     bool get_high_pressure_event_flag() { return _high_pressure_event_flag; };
 
+    void set_max_buffer_size(uint16_t size);
+    uint16_t get_max_buffer_size() { return _max_buffer_size; };
+    bool get_buffer_full() { return _pressure_buffer.size() >= _max_buffer_size; };
+
     uint16_t get_pressure_buffer_size() { return _pressure_buffer.size(); };
     uint16_t get_temp_buffer_size() { return _temperature_buffer.size(); };
     uint16_t* get_pressure_array() { return _pressure_buffer.data(); };
@@ -32,6 +36,7 @@ private:
     std::vector<uint16_t> _pressure_buffer;
     std::vector<uint16_t> _temperature_buffer;
     bool _high_pressure_event_flag = false;
+    uint16_t _max_buffer_size = 100; // by default
 
     BusControl *_bus_control;
     LPS22HBSensor _barometer;
