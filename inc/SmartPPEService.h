@@ -82,12 +82,12 @@ public:
 
     void updatePressure(uint16_t *pressure_array, uint16_t size)
     {
-        _server->write(_pressure_characteristic->getValueHandle(), (uint8_t*)pressure_array, size > 200 ? 200 : size);
+        _server->write(_pressure_characteristic->getValueHandle(), (uint8_t*)pressure_array, (size * 2) > 200 ? 200 : (size * 2));
     }
 
     void updateTemperature(uint16_t *temperature_array, uint16_t size)
     {
-        _server->write(_temperature_characteristic->getValueHandle(), (uint8_t*)temperature_array, size > 200 ? 200 : size);
+        _server->write(_temperature_characteristic->getValueHandle(), (uint8_t*)temperature_array, (size * 2) > 200 ? 200 : (size * 2));
     }
 
     void updateDataReady(bool ready)
