@@ -75,7 +75,7 @@ void sensor_thread(SmartPPEService* smart_ppe_service)
     bus_control->spi_power(true);
     Barometer barometer(&spi, BAR_CS, BAR_DRDY);
 
-    ThisThread::sleep_for(100ms);
+    ThisThread::sleep_for(50ms);
     
     if (!barometer.initialize() || !barometer.set_fifo_full_interrupt(true))
     {
@@ -97,10 +97,6 @@ void sensor_thread(SmartPPEService* smart_ppe_service)
             if (barometer.get_buffer_full())
             {
                 LOG_DEBUG("buffer full. %u elements.", barometer.get_pressure_buffer_size());
-                for (int i = 0; i < barometer.get_pressure_buffer_size(); i++)
-                {
-                    LOG_INFO("pressure[%i] = %u", i, barometer.get_pressure_array()[i]);
-                }
                 smart_ppe_service->updatePressure(barometer.get_pressure_array(), barometer.get_pressure_buffer_size());
                 smart_ppe_service->updateTemperature(barometer.get_temperature_array(), barometer.get_temp_buffer_size());
                 smart_ppe_service->updateDataReady(true);

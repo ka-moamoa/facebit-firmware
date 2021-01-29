@@ -93,7 +93,7 @@ public:
             bytearray[i*2] = (uint8_t)((pressure_array[i] >> 8) & 0xFF);
             bytearray[(i*2)+1] = (uint8_t)(pressure_array[i] & 0xFF);
         }
-        _server->write(_pressure_characteristic->getValueHandle(), bytearray, 200);
+        _server->write(_pressure_characteristic->getValueHandle(), bytearray, size * 2);
     }
 
     void updateTemperature(uint16_t *temperature_array, uint16_t size)
@@ -109,7 +109,7 @@ public:
             bytearray[i*2] = (uint8_t)((temperature_array[i] >> 8) & 0xFF);
             bytearray[(i*2)+1] = (uint8_t)(temperature_array[i] & 0xFF);
         }
-        _server->write(_temperature_characteristic->getValueHandle(), bytearray, size);
+        _server->write(_temperature_characteristic->getValueHandle(), bytearray, size * 2);
     }
 
     void updateDataReady(bool ready)
