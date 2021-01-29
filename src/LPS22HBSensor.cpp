@@ -41,7 +41,6 @@
 
 #include "LPS22HBSensor.h"
 
-
 /* Class Implementation ------------------------------------------------------*/
 
 LPS22HBSensor::LPS22HBSensor(SPI *spi, PinName cs_pin, PinName int_pin, SPI_type_t spi_type)  : _dev_spi(spi), _cs_pin(cs_pin), _int_pin(int_pin), _spi_type(spi_type)
@@ -624,7 +623,9 @@ int LPS22HBSensor::get_fifo(std::vector<uint16_t> &pressure_buffer, std::vector<
       return 1;
     }
 
-    pressure_buffer.push_back(pressure_data);
+    uint16_t pressure_adj = pressure_data - 80000;
+
+    pressure_buffer.push_back(pressure_adj);
 
     int16_t temp_data = 0;
     if (LPS22HB_Get_Temperature((void *)this, &temp_data) == LPS22HB_ERROR)
@@ -632,7 +633,9 @@ int LPS22HBSensor::get_fifo(std::vector<uint16_t> &pressure_buffer, std::vector<
       return 1;
     }
 
-    temperature_buffer.push_back(temp_data);
+    uint16_t temp_adj = temp_data;
+
+    temperature_buffer.push_back(temp_adj);
   }
   
   return 0;

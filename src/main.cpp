@@ -69,10 +69,13 @@ void process_data(float *pressure_data)
 void sensor_thread(SmartPPEService* smart_ppe_service)
 {   
     ThisThread::sleep_for(10ms);
+
     bus_control->init();
 
     bus_control->spi_power(true);
     Barometer barometer(&spi, BAR_CS, BAR_DRDY);
+
+    ThisThread::sleep_for(100ms);
     
     if (!barometer.initialize() || !barometer.set_fifo_full_interrupt(true))
     {
@@ -91,14 +94,9 @@ void sensor_thread(SmartPPEService* smart_ppe_service)
     {
         if (barometer.update())
         {
-            if (barometer.get_high_pressure_event_flag())
-            {
-                LOG_INFO("%s", "High pressure event detected!");
-            }
-
             if (barometer.get_buffer_full())
             {
-                LOG_DEBUG("pressure_buffer full! %u elements", barometer.get_pressure_buffer_size());
+                LOG_DEBUG("buffer full. %u elements.", barometer.get_pressure_buffer_size());
                 smart_ppe_service->updatePressure(barometer.get_pressure_array(), barometer.get_pressure_buffer_size());
                 smart_ppe_service->updateTemperature(barometer.get_temperature_array(), barometer.get_temp_buffer_size());
                 smart_ppe_service->updateDataReady(true);
