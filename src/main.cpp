@@ -109,7 +109,7 @@ void sensor_thread(SmartPPEService* smart_ppe_service)
         }
     }
 
-    ThisThread::sleep_for(1ms);
+    ThisThread::sleep_for(200ms);
 }
 
 int main()
