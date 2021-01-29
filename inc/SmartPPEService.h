@@ -24,12 +24,12 @@ public:
         const UUID imu_uuid(IMU_UUID);
         const UUID mic_uuid(MICROPHONE_UUID);
 
-        _pressure_characteristic = new ReadOnlyArrayGattCharacteristic<uint16_t, 100> (pressure_uuid, &_initial_value_uint16_t);
+        _pressure_characteristic = new ReadOnlyArrayGattCharacteristic<uint8_t, 200> (pressure_uuid, &_initial_value_uint8_t);
         if (!_pressure_characteristic) {
             printf("Allocation of pressure characteristic failed\r\n");
         }
 
-        _temperature_characteristic = new ReadOnlyArrayGattCharacteristic<uint16_t, 100> (temp_uuid, &_initial_value_uint16_t);
+        _temperature_characteristic = new ReadOnlyArrayGattCharacteristic<uint8_t, 200> (temp_uuid, &_initial_value_uint8_t);
         if (!_temperature_characteristic) {
             printf("Allocation of temperature characteristic failed\r\n");
         }
@@ -82,6 +82,10 @@ public:
 
     void updatePressure(uint16_t *pressure_array, uint16_t size)
     {
+        for (int i = 0; i < size * 2; i++)
+        {
+            LOG_DEBUG("pressure uint8_t [%i] = 0x%02X", i, (uint8_t)pressure_array[i]);
+        }
         _server->write(_pressure_characteristic->getValueHandle(), (uint8_t*)pressure_array, (size * 2) > 200 ? 200 : (size * 2));
     }
 
@@ -99,13 +103,14 @@ public:
 private:
     GattServer* _server = nullptr;
 
-    ReadOnlyArrayGattCharacteristic<uint16_t, 100>* _pressure_characteristic = nullptr;
-    ReadOnlyArrayGattCharacteristic<uint16_t, 100>* _temperature_characteristic = nullptr;
+    ReadOnlyArrayGattCharacteristic<uint8_t, 200>* _pressure_characteristic = nullptr;
+    ReadOnlyArrayGattCharacteristic<uint8_t, 200>* _temperature_characteristic = nullptr;
     ReadOnlyGattCharacteristic<uint16_t>* _air_quality_characteristic = nullptr;
     ReadOnlyGattCharacteristic<uint16_t>* _imu_characteristic = nullptr;
     ReadOnlyGattCharacteristic<uint16_t>* _mag_characteristic = nullptr;
     ReadOnlyGattCharacteristic<uint16_t>* _mic_characteristic = nullptr;
 
+    uint8_t _initial_value_uint8_t = 0;
     uint16_t _initial_value_uint16_t = 0;
     uint32_t _initial_value_uint32_t = 0;
 };
