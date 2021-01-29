@@ -83,10 +83,10 @@ public:
     void updatePressure(uint16_t *pressure_array, uint16_t size)
     {
         uint8_t bytearray[200] = {0};
-        for (int i = 0; i < 200; i+=2)
+        for (int i = 0; i < 100; i++)
         {
-            bytearray[i] = (uint8_t)((pressure_array[i] >> 8) & 0xFF);
-            bytearray[i+1] = (uint8_t)(pressure_array[i] & 0xFF);
+            bytearray[i*2] = (uint8_t)((pressure_array[i] >> 8) & 0xFF);
+            bytearray[(i*2)+1] = (uint8_t)(pressure_array[i] & 0xFF);
         }
         for (int i = 0; i < 200; i++)
         {
