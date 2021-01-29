@@ -46,6 +46,9 @@ static events::EventQueue event_queue(/* event count */ 16 * EVENTS_EVENT_SIZE);
 
 Thread thread1(osPriorityNormal, 256);
 Thread thread2;
+Thread thread3(osPriorityNormal, 512);
+
+LowPowerTimer sensor_timeout;
 
 void led_thread()
 {
@@ -60,10 +63,7 @@ void led_thread()
 
 void process_data(float *pressure_data)
 {
-    // for (int i = 0; i < FIFO_LENGTH; i++)
-    // {
-    //     LOG_INFO("pressure[%i] = %0.2f", i, pressure_data[i]);
-    // }
+
 }
 
 void sensor_thread(SmartPPEService* smart_ppe_service)
@@ -75,7 +75,7 @@ void sensor_thread(SmartPPEService* smart_ppe_service)
     bus_control->spi_power(true);
     Barometer barometer(&spi, BAR_CS, BAR_DRDY);
 
-    ThisThread::sleep_for(50ms);
+    ThisThread::sleep_for(100ms);
     
     if (!barometer.initialize() || !barometer.set_fifo_full_interrupt(true))
     {
@@ -88,7 +88,6 @@ void sensor_thread(SmartPPEService* smart_ppe_service)
         LOG_WARNING("%s", "barometer setup failed");
         while(1) {};
     }
-    
 
     while(1)
     {
@@ -103,9 +102,26 @@ void sensor_thread(SmartPPEService* smart_ppe_service)
                 barometer.clear_buffers();
             }
         }
+        sensor_timeout.reset();
+        ThisThread::sleep_for(200ms);
     }
+}
 
-    ThisThread::sleep_for(200ms);
+void watchdog_thread(SmartPPEService* smart_ppe_service)
+{
+    while(1)
+    {
+        if (sensor_timeout.read_ms() > 10000)
+        {
+            LOG_WARNING("Restarting sensor thread. Unresponsive for %i ms", sensor_timeout.read_ms());
+            bus_control->spi_power(false);
+            thread2.terminate();
+            thread2.start(callback(sensor_thread, smart_ppe_service));
+            sensor_timeout.reset();
+        }
+        ThisThread::sleep_for(100ms);
+        // LOG_INFO("sensor timer = %i", sensor_timeout.read_ms());
+    }
 }
 
 int main()
@@ -115,7 +131,9 @@ int main()
     SmartPPEService smart_ppe_ble;
 
     thread1.start(led_thread);
+    sensor_timeout.start();
     thread2.start(callback(sensor_thread, &smart_ppe_ble));
+    thread3.start(callback(watchdog_thread, &smart_ppe_ble));
 
     GattServerProcess ble_process(event_queue, ble);
     ble_process.on_init(callback(&smart_ppe_ble, &SmartPPEService::start));
