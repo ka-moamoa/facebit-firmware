@@ -82,11 +82,17 @@ public:
 
     void updatePressure(uint16_t *pressure_array, uint16_t size)
     {
-        for (int i = 0; i < size * 2; i++)
+        uint8_t bytearray[200] = {0};
+        for (int i = 0; i < 200; i+=2)
         {
-            LOG_DEBUG("pressure uint8_t [%i] = 0x%02X", i, (uint8_t)pressure_array[i]);
+            bytearray[i] = (uint8_t)((pressure_array[i] >> 8) & 0xFF);
+            bytearray[i+1] = (uint8_t)(pressure_array[i] & 0xFF);
         }
-        _server->write(_pressure_characteristic->getValueHandle(), (uint8_t*)pressure_array, (size * 2) > 200 ? 200 : (size * 2));
+        for (int i = 0; i < 200; i++)
+        {
+            LOG_INFO("bytearray[%i] = 0x%02X", i, bytearray[i]);
+        }
+        _server->write(_pressure_characteristic->getValueHandle(), bytearray, 200);
     }
 
     void updateTemperature(uint16_t *temperature_array, uint16_t size)
