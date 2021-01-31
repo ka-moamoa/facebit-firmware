@@ -100,7 +100,7 @@ int main()
     BLE &ble = BLE::Instance();
     SmartPPEService smart_ppe_ble;
 
-    thread1.start(led_thread);
+    //thread1.start(led_thread);
     
     lp_ticker_led.attach(&led_thread,LED_TASK);
 
