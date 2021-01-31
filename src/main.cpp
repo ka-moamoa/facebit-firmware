@@ -28,8 +28,9 @@
 #include "Config.h"
 #include "SmartPPEService.h"
 
+// Frequency configuration of each task
  const std::chrono::milliseconds LED_TASK= 1000ms;
- const std::chrono::milliseconds SENSOR_TASK= 1000ms;
+ const std::chrono::milliseconds SENSING_TASK= 1000ms;
 
 
  DigitalOut led(LED1);
@@ -105,7 +106,7 @@ int main()
     lp_ticker_led.attach(&led_thread,LED_TASK);
 
     //thread2.start(sensor_thread/*callback(sensor_thread, &smart_ppe_ble)*/);
-    lp_ticker_sensor.attach(&sensor_thread,SENSOR_TASK);
+    lp_ticker_sensor.attach(&sensor_thread,SENSING_TASK);
    
     GattServerProcess ble_process(event_queue, ble);
     ble_process.on_init(callback(&smart_ppe_ble, &SmartPPEService::start));
