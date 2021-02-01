@@ -44,38 +44,33 @@ const static char DEVICE_NAME[] = "SMARTPPE";
 
 static events::EventQueue event_queue(/* event count */ 16 * EVENTS_EVENT_SIZE);
 
-Thread thread1(osPriorityNormal, 256);
-Thread thread2;
-Thread thread3(osPriorityNormal, 512);
+Thread *thread1;
+Thread *thread2;
 
-LowPowerTimer sensor_timeout;
+SmartPPEService smart_ppe_ble;
 
 void led_thread()
 {
     while(1)
     {
         led = 0;
-        ThisThread::sleep_for(1000ms);
+        ThisThread::sleep_for(2000ms);
         led = 1;
-        ThisThread::sleep_for(10ms);
+        ThisThread::sleep_for(1ms);
     }
 }
 
-void process_data(float *pressure_data)
-{
-
-}
-
-void sensor_thread(SmartPPEService* smart_ppe_service)
+void sensor_thread()
 {   
     ThisThread::sleep_for(10ms);
 
     bus_control->init();
-
     bus_control->spi_power(true);
-    Barometer barometer(&spi, BAR_CS, BAR_DRDY);
 
-    ThisThread::sleep_for(100ms);
+    Barometer barometer(&spi, BAR_CS, BAR_DRDY);
+    spi.frequency(5000000);
+
+    ThisThread::sleep_for(10ms);
     
     if (!barometer.initialize() || !barometer.set_fifo_full_interrupt(true))
     {
@@ -83,7 +78,7 @@ void sensor_thread(SmartPPEService* smart_ppe_service)
         while(1) {};
     }
 
-    if (!barometer.set_pressure_threshold(1010) || !barometer.enable_pressure_threshold(true, true, false))
+    if (!barometer.set_pressure_threshold(1100) || !barometer.enable_pressure_threshold(true, true, false))
     {
         LOG_WARNING("%s", "barometer setup failed");
         while(1) {};
@@ -96,44 +91,27 @@ void sensor_thread(SmartPPEService* smart_ppe_service)
             if (barometer.get_buffer_full())
             {
                 LOG_DEBUG("buffer full. %u elements.", barometer.get_pressure_buffer_size());
-                smart_ppe_service->updatePressure(barometer.get_pressure_array(), barometer.get_pressure_buffer_size());
-                smart_ppe_service->updateTemperature(barometer.get_temperature_array(), barometer.get_temp_buffer_size());
-                smart_ppe_service->updateDataReady(true);
+                smart_ppe_ble.updatePressure(barometer.get_pressure_array(), barometer.get_pressure_buffer_size());
+                smart_ppe_ble.updateTemperature(barometer.get_temperature_array(), barometer.get_temp_buffer_size());
+                smart_ppe_ble.updateDataReady(true);
                 barometer.clear_buffers();
             }
         }
-        sensor_timeout.reset();
         ThisThread::sleep_for(200ms);
-    }
-}
-
-void watchdog_thread(SmartPPEService* smart_ppe_service)
-{
-    while(1)
-    {
-        if (sensor_timeout.read_ms() > 10000)
-        {
-            LOG_WARNING("Restarting sensor thread. Unresponsive for %i ms", sensor_timeout.read_ms());
-            bus_control->spi_power(false);
-            thread2.terminate();
-            thread2.start(callback(sensor_thread, smart_ppe_service));
-            sensor_timeout.reset();
-        }
-        ThisThread::sleep_for(100ms);
-        // LOG_INFO("sensor timer = %i", sensor_timeout.read_ms());
     }
 }
 
 int main()
 {
     swo.claim();
-    BLE &ble = BLE::Instance();
-    SmartPPEService smart_ppe_ble;
 
-    thread1.start(led_thread);
-    sensor_timeout.start();
-    thread2.start(callback(sensor_thread, &smart_ppe_ble));
-    thread3.start(callback(watchdog_thread, &smart_ppe_ble));
+    thread1 = new Thread(osPriorityNormal, 512);
+    thread2 = new Thread();
+
+    BLE &ble = BLE::Instance();
+
+    thread1->start(led_thread);
+    thread2->start(sensor_thread);
 
     GattServerProcess ble_process(event_queue, ble);
     ble_process.on_init(callback(&smart_ppe_ble, &SmartPPEService::start));

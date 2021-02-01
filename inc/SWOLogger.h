@@ -18,7 +18,7 @@ const uint8_t trace_level = TRACE_DEBUG;
 { \
     if (trace_level <= TRACE_DEBUG) \
     { \
-        printf("\r\n[D] // %s, %i --> " msg,  __FILE__, __LINE__, __VA_ARGS__); \
+        printf("[D] // %s, %i --> " msg "\r\n",  __FILE__, __LINE__, __VA_ARGS__); \
     } \
 }
 
@@ -26,7 +26,7 @@ const uint8_t trace_level = TRACE_DEBUG;
 { \
     if (trace_level <= TRACE_INFO) \
     { \
-        printf("\r\n[I] // %s, %i --> " msg,  __FILE__, __LINE__, __VA_ARGS__); \
+        printf("[I] // %s, %i --> " msg "\r\n",  __FILE__, __LINE__, __VA_ARGS__); \
     } \
 }
 
@@ -34,7 +34,7 @@ const uint8_t trace_level = TRACE_DEBUG;
 { \
     if (trace_level <= TRACE_WARNING) \
     { \
-        printf("\r\n[W] // %s, %i --> " msg,  __FILE__, __LINE__, __VA_ARGS__); \
+        printf("[W] // %s, %i --> " msg "\r\n",  __FILE__, __LINE__, __VA_ARGS__); \
     } \
 }
 #endif // LOGGER_H_
