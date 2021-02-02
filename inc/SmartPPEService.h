@@ -80,7 +80,7 @@ public:
         printf("Example service added with UUID 6243fabc-23e9-4b79-bd30-1dc57b8005d6\r\n");
     }
 
-    void updatePressure(uint64_t data_timestamp, uint16_t *pressure_array, uint16_t size)
+    void updatePressure(uint64_t data_timestamp, uint32_t measurement_frequencyx100, uint16_t *pressure_array, uint8_t size)
     {
         if (size > 100)
         {
@@ -91,15 +91,21 @@ public:
         uint64_t timestamp = data_timestamp;
         std::memcpy(bytearray, &timestamp, 8);
 
+        uint32_t tmp_frequency = measurement_frequencyx100;
+        std::memcpy(&bytearray[8], &tmp_frequency, 4);
+
+        uint8_t num_samples = size;
+        std::memcpy(&bytearray[12], &num_samples, 1);
+
         for (int i = 0; i < size; i++)
         {
-            bytearray[8 + i*2] = (uint8_t)((pressure_array[i] >> 8) & 0xFF);
-            bytearray[8 + (i*2)+1] = (uint8_t)(pressure_array[i] & 0xFF);
+            bytearray[13 + i*2] = (uint8_t)((pressure_array[i] >> 8) & 0xFF);
+            bytearray[13 + (i*2)+1] = (uint8_t)(pressure_array[i] & 0xFF);
         }
-        _server->write(_pressure_characteristic->getValueHandle(), bytearray, (size * 2) + 8);
+        _server->write(_pressure_characteristic->getValueHandle(), bytearray, (size * 2) + 13);
     }
 
-    void updateTemperature(uint64_t data_timestamp, uint16_t *temperature_array, uint16_t size)
+    void updateTemperature(uint64_t data_timestamp, uint32_t measurement_frequencyx100, uint16_t *temperature_array, uint8_t size)
     {
         if (size > 100)
         {
@@ -110,12 +116,18 @@ public:
         uint64_t timestamp = data_timestamp;
         std::memcpy(bytearray, &timestamp, 8);
 
+        uint32_t tmp_frequency = measurement_frequencyx100;
+        std::memcpy(&bytearray[8], &tmp_frequency, 4);
+
+        uint8_t num_samples = size;
+        std::memcpy(&bytearray[12], &num_samples, 1);
+
         for (int i = 0; i < size; i++)
         {
-            bytearray[8 + i*2] = (uint8_t)((temperature_array[i] >> 8) & 0xFF);
-            bytearray[8 + (i*2)+1] = (uint8_t)(temperature_array[i] & 0xFF);
+            bytearray[13 + i*2] = (uint8_t)((temperature_array[i] >> 8) & 0xFF);
+            bytearray[13 + (i*2)+1] = (uint8_t)(temperature_array[i] & 0xFF);
         }
-        _server->write(_temperature_characteristic->getValueHandle(), bytearray, (size * 2) + 8);
+        _server->write(_temperature_characteristic->getValueHandle(), bytearray, (size * 2) + 13);
     }
 
     void updateDataReady(bool ready)

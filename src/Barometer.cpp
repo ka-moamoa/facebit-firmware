@@ -1,4 +1,5 @@
 #include "Barometer.hpp"
+#include "Utilites.h"
 
 using namespace std::chrono;
 
@@ -126,6 +127,10 @@ bool Barometer::set_pressure_threshold(int16_t hPa)
 void Barometer::bar_data_ready()
 {
     _drdy_timestamp = duration_cast<milliseconds>(_t_barometer.elapsed_time()).count();
+    float measurement_frequency = 1000 * (float)BAROMETER_FIFO_SIZE / ((float)_drdy_timestamp - (float)_last_timestamp);
+    _measurement_frequencyx100 = Utilities::round(measurement_frequency * 100);
+    _last_timestamp = _drdy_timestamp;
+
     _bar_data_ready = true;
 }
 

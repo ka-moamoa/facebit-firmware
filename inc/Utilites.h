@@ -14,7 +14,7 @@ namespace Utilities
 
     double round(double val)
     {
-        return floor(d + 0.5)
+        return floor(val + 0.5);
     }
 
 }
