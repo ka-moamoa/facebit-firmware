@@ -38,7 +38,7 @@ private:
     std::vector<uint16_t> _pressure_buffer;
     std::vector<uint16_t> _temperature_buffer;
     bool _high_pressure_event_flag = false;
-    uint16_t _max_buffer_size = 100; // by default
+    uint16_t _max_buffer_size = 96; // by default
     uint64_t _drdy_timestamp;
 
     BusControl *_bus_control;

@@ -1,0 +1,3 @@
+[submodule "smartppe-ble-utils"]
+	path = smartppe-ble-utils
+	url = https://gitlab.com/ka-moamoa/smart-ppe/smartppe-ble-utils.git
