@@ -23,13 +23,22 @@
 #include "I2C.h"
 #include "SWO.h"
 #include "SWOLogger.h"
+#include "CapCalc.h"
 
 #include "BusControl.h"
 #include "Barometer.hpp"
 
 #include "SmartPPEService.h"
 
+const int LED_ENERGY = 1;
+const int SENSING_ENERGY = 1;
 
+const bool RUN_LED = true;
+const bool RUN_SENSING =false;
+
+LowPowerTicker ticker1,ticker2;
+CapCalc cap(VCAP, VCAP_ENABLE, 3000);
+float available_energy = 0;
 
 DigitalOut led(LED1);
 BusControl *bus_control = BusControl::get_instance();
@@ -49,32 +58,33 @@ static events::EventQueue event_queue(/* event count */ 16 * EVENTS_EVENT_SIZE);
 Thread thread1;
 Thread thread2;
 
+
 void led_thread()
 {
-    while(1)
+    available_energy = cap.calc_joules();
+    if (RUN_LED || (available_energy > LED_ENERGY))
     {
-        led = 0;
-        ThisThread::sleep_for(1000ms);
-        led = 1;
-        ThisThread::sleep_for(10ms);
+        led = !led;
     }
 }
-
 void sensor_thread(/*SmartPPEService* smart_ppe_service*/)
-{   
-    ThisThread::sleep_for(10ms);
-    bus_control->init();
-
-    bus_control->spi_power(true);
-    Barometer barometer(&spi, BAR_CS, BAR_DRDY);
-    if (!barometer.initialize())
+{
+    available_energy = cap.calc_joules();
+    float cap_voltage = cap.read_capacitor_voltage();
+    if(RUN_SENSING || (available_energy > SENSING_ENERGY && cap_voltage > 2.3))
     {
-        LOG_WARNING("%s", "barometer failed to initialize");
-        while(1) {};
-    }
+        ThisThread::sleep_for(10ms);
+        bus_control->init();
 
-    while(1)
-    {
+        bus_control->spi_power(true);
+        Barometer barometer(&spi, BAR_CS, BAR_DRDY);
+        if (!barometer.initialize())
+        {
+            LOG_WARNING("%s", "barometer failed to initialize");
+            while (1)
+            {
+            };
+        }
         if (barometer.update())
         {
             float pressure_data[FIFO_LENGTH];
@@ -93,12 +103,12 @@ void sensor_thread(/*SmartPPEService* smart_ppe_service*/)
 
 int main()
 {
-    swo.claim();
+    //swo.claim();
     // BLE &ble = BLE::Instance();
     // SmartPPEService smart_ppe_ble;
 
-    thread1.start(led_thread);
-    thread2.start(sensor_thread/*callback(sensor_thread, &smart_ppe_ble)*/);
+    ticker1.attach(led_thread, 1000ms);
+    ticker2.attach(sensor_thread,1000ms /*callback(sensor_thread, &smart_ppe_ble)*/);
 
     // GattServerProcess ble_process(event_queue, ble);
     // ble_process.on_init(callback(&smart_ppe_ble, &SmartPPEService::start));
@@ -107,4 +117,3 @@ int main()
 
     return 0;
 }
-
