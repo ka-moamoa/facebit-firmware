@@ -42,7 +42,7 @@ using namespace std::literals::chrono_literals;
 
 const static char DEVICE_NAME[] = "SMARTPPE";
 
-static events::EventQueue event_queue(/* event count */ 16 * EVENTS_EVENT_SIZE);
+static events::EventQueue event_queue(16 * EVENTS_EVENT_SIZE);
 
 Thread *thread1;
 Thread *thread2;
@@ -56,7 +56,7 @@ void led_thread()
         led = 0;
         ThisThread::sleep_for(2000ms);
         led = 1;
-        ThisThread::sleep_for(1ms);
+        ThisThread::sleep_for(5ms);
     }
 }
 
@@ -91,8 +91,8 @@ void sensor_thread()
             if (barometer.get_buffer_full())
             {
                 LOG_DEBUG("buffer full. %u elements.", barometer.get_pressure_buffer_size());
-                smart_ppe_ble.updatePressure(barometer.get_pressure_array(), barometer.get_pressure_buffer_size());
-                smart_ppe_ble.updateTemperature(barometer.get_temperature_array(), barometer.get_temp_buffer_size());
+                smart_ppe_ble.updatePressure(barometer.get_drdy_timestamp(), barometer.get_pressure_array(), barometer.get_pressure_buffer_size());
+                smart_ppe_ble.updateTemperature(barometer.get_drdy_timestamp(), barometer.get_temperature_array(), barometer.get_temp_buffer_size());
                 smart_ppe_ble.updateDataReady(true);
                 barometer.clear_buffers();
             }

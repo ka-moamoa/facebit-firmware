@@ -30,6 +30,7 @@ public:
     uint16_t* get_pressure_array() { return _pressure_buffer.data(); };
     uint16_t* get_temperature_array() { return _temperature_buffer.data(); };
     void clear_buffers() { _temperature_buffer.clear(); _pressure_buffer.clear(); };
+    uint64_t get_drdy_timestamp() { return _drdy_timestamp; };
 private:
     bool _initialized = false;
     bool _bar_data_ready = false;
@@ -38,10 +39,12 @@ private:
     std::vector<uint16_t> _temperature_buffer;
     bool _high_pressure_event_flag = false;
     uint16_t _max_buffer_size = 100; // by default
+    uint64_t _drdy_timestamp;
 
     BusControl *_bus_control;
     LPS22HBSensor _barometer;
     InterruptIn _int_pin;
+    LowPowerTimer _t_barometer;
 
     void bar_data_ready();
     bool read_buffered_data();

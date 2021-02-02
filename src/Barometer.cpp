@@ -1,8 +1,11 @@
 #include "Barometer.hpp"
 
+using namespace std::chrono;
+
 Barometer::Barometer(SPI *spi, PinName cs_pin, PinName int_pin) :
 _barometer(spi, cs_pin),
-_int_pin(int_pin)
+_int_pin(int_pin),
+_t_barometer()
 {
 }
 
@@ -54,6 +57,7 @@ bool Barometer::initialize()
     _int_pin.rise(callback(this, &Barometer::bar_data_ready));
 
     LOG_DEBUG("%s", "Barometer initialized successfully");
+    _t_barometer.start();
     _initialized = true;
     return true;
 }
@@ -121,6 +125,7 @@ bool Barometer::set_pressure_threshold(int16_t hPa)
 
 void Barometer::bar_data_ready()
 {
+    _drdy_timestamp = duration_cast<milliseconds>(_t_barometer.elapsed_time()).count();
     _bar_data_ready = true;
 }
 
