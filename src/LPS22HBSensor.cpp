@@ -41,7 +41,6 @@
 
 #include "LPS22HBSensor.h"
 
-
 /* Class Implementation ------------------------------------------------------*/
 
 LPS22HBSensor::LPS22HBSensor(SPI *spi, PinName cs_pin, PinName int_pin, SPI_type_t spi_type)  : _dev_spi(spi), _cs_pin(cs_pin), _int_pin(int_pin), _spi_type(spi_type)
@@ -411,9 +410,9 @@ int LPS22HBSensor::get_fifo_enabled(uint8_t *enabled)
  * @brief  Enable LPS22HB full interrupt
  * @retval 0 in case of success, an error code otherwise
  */
-int LPS22HBSensor::enable_fifo_full_interrupt(void)
+int LPS22HBSensor::fifo_full_interrupt(bool enable)
 {
-  if(LPS22HB_Set_FIFO_FULL_Interrupt( (void *)this, LPS22HB_ENABLE) == LPS22HB_ERROR)
+  if(LPS22HB_Set_FIFO_FULL_Interrupt( (void *)this, enable ? LPS22HB_ENABLE : LPS22HB_DISABLE) == LPS22HB_ERROR)
   {
     return 1;
   }
@@ -614,42 +613,72 @@ int LPS22HBSensor::get_pressure_fifo(float *pfData)
   return 0;
 }
 
-int LPS22HBSensor::get_fifo(LPS22HB_Data_st *data)
+int LPS22HBSensor::get_fifo(std::vector<uint16_t> &pressure_buffer, std::vector<uint16_t> &temperature_buffer)
 {
-    // float tmp_pressure[FIFO_LENGTH], tmp_temperature[FIFO_LENGTH] = {0};
-    for (int i = 0; i < FIFO_LENGTH; i++)
+  for (int i = 0; i < FIFO_LENGTH; i++)
+  {
+    int32_t pressure_data = 0;
+    if (LPS22HB_Get_Pressure((void *)this, &pressure_data) == LPS22HB_ERROR)
     {
-      int32_t pressure_data = 0;
-      if (LPS22HB_Get_Pressure((void *)this, &pressure_data) == LPS22HB_ERROR)
-      {
-        return 1;
-      }
-
-      data[i].pressure = (float)pressure_data / 100.0f;
-
-      int16_t temp_data = 0;
-      if (LPS22HB_Get_Temperature((void *)this, &temp_data) == LPS22HB_ERROR)
-      {
-        return 1;
-      }
-
-      data[i].temperature = (float)temp_data / 100.0f;
+      return 1;
     }
-    // if ( get_pressure_fifo(tmp_pressure) == 1)
-    // {
-    //   return 1;
-    // }
-    // if ( get_temperature_fifo(tmp_temperature) == 1)
-    // {
-    //   return 1;
-    // }
-    // uint8_t i = 0;
-    // for(i=0; i<FIFO_LENGTH; i++)
-    // {
-    //     data[i].temperature = tmp_temperature[i];
-    //     data[i].pressure = tmp_pressure[i];
-    // }
-    return 0;
+
+    uint16_t pressure_adj = pressure_data - 80000;
+
+    pressure_buffer.push_back(pressure_adj);
+
+    int16_t temp_data = 0;
+    if (LPS22HB_Get_Temperature((void *)this, &temp_data) == LPS22HB_ERROR)
+    {
+      return 1;
+    }
+
+    uint16_t temp_adj = temp_data;
+
+    temperature_buffer.push_back(temp_adj);
+  }
+  
+  return 0;
+}
+
+int LPS22HBSensor::differential_interrupt(bool enable, bool high_pressure, bool low_pressure)
+{
+  if (LPS22HB_Set_InterruptDifferentialGeneration((void *)this, enable ? LPS22HB_ENABLE : LPS22HB_DISABLE) == LPS22HB_ERROR)
+  {
+    return 1;
+  }
+
+  if (LPS22HB_Set_PHE((void *)this, high_pressure ? LPS22HB_ENABLE : LPS22HB_DISABLE) == LPS22HB_ERROR)
+  {
+    return 1;
+  }
+
+  if (LPS22HB_Set_PLE((void *)this, low_pressure ? LPS22HB_ENABLE : LPS22HB_DISABLE) == LPS22HB_ERROR)
+  {
+    return 1;
+  }
+
+  return 0;
+}
+
+int LPS22HBSensor::set_interrupt_pressure(int16_t hPa)
+{
+  if (LPS22HB_Set_PressureThreshold((void *)this, hPa) == LPS22HB_ERROR)
+  {
+    return 1;
+  }
+
+  return 0;
+}
+
+int LPS22HBSensor::get_interrupt_status(LPS22HB_InterruptDiffStatus_st *int_source)
+{
+  if (LPS22HB_Get_InterruptDifferentialEventStatus((void *)this, int_source))
+  {
+    return 1;
+  }
+
+  return 0;
 }
 
 uint8_t LPS22HB_io_write( void *handle, uint8_t WriteAddr, uint8_t *pBuffer, uint16_t nBytesToWrite )

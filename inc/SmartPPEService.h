@@ -24,12 +24,12 @@ public:
         const UUID imu_uuid(IMU_UUID);
         const UUID mic_uuid(MICROPHONE_UUID);
 
-        _pressure_characteristic = new ReadOnlyGattCharacteristic<uint32_t> (pressure_uuid, &_initial_value_uint32_t,  GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_NOTIFY);
+        _pressure_characteristic = new ReadOnlyArrayGattCharacteristic<uint8_t, 208> (pressure_uuid, &_initial_value_uint8_t);
         if (!_pressure_characteristic) {
             printf("Allocation of pressure characteristic failed\r\n");
         }
 
-        _temperature_characteristic = new ReadOnlyGattCharacteristic<uint32_t> (temp_uuid, &_initial_value_uint32_t, GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_NOTIFY);
+        _temperature_characteristic = new ReadOnlyArrayGattCharacteristic<uint8_t, 208> (temp_uuid, &_initial_value_uint8_t);
         if (!_temperature_characteristic) {
             printf("Allocation of temperature characteristic failed\r\n");
         }
@@ -80,38 +80,73 @@ public:
         printf("Example service added with UUID 6243fabc-23e9-4b79-bd30-1dc57b8005d6\r\n");
     }
 
-    void updatePressure(uint32_t pressurex100)
+    void updatePressure(uint64_t data_timestamp, uint32_t measurement_frequencyx100, uint16_t *pressure_array, uint8_t size)
     {
-        const uint8_t pressure_array[4] = {
-            (uint8_t)((pressurex100 >>24) & 0xFF),
-            (uint8_t)((pressurex100 >>16) & 0xFF),
-            (uint8_t)((pressurex100 >>8) & 0xFF),
-            (uint8_t)((pressurex100) & 0xFF) };
+        if (size > 100)
+        {
+            size = 100;
+        }
 
-        _server->write(_pressure_characteristic->getValueHandle(), pressure_array, 4);
+        uint8_t bytearray[208] = {0};
+        uint64_t timestamp = data_timestamp;
+        std::memcpy(bytearray, &timestamp, 8);
+
+        uint32_t tmp_frequency = measurement_frequencyx100;
+        std::memcpy(&bytearray[8], &tmp_frequency, 4);
+
+        uint8_t num_samples = size;
+        std::memcpy(&bytearray[12], &num_samples, 1);
+
+        for (int i = 0; i < size; i++)
+        {
+            bytearray[13 + i*2] = (uint8_t)((pressure_array[i] >> 8) & 0xFF);
+            bytearray[13 + (i*2)+1] = (uint8_t)(pressure_array[i] & 0xFF);
+        }
+        _server->write(_pressure_characteristic->getValueHandle(), bytearray, (size * 2) + 13);
     }
 
-    void updateTemperature(uint32_t temperaturex10000)
+    void updateTemperature(uint64_t data_timestamp, uint32_t measurement_frequencyx100, uint16_t *temperature_array, uint8_t size)
     {
-        const uint8_t temp_array[4] = {
-            (uint8_t)((temperaturex10000 >>24) & 0xFF),
-            (uint8_t)((temperaturex10000 >>16) & 0xFF),
-            (uint8_t)((temperaturex10000 >>8) & 0xFF),
-            (uint8_t)((temperaturex10000) & 0xFF) };
+        if (size > 100)
+        {
+            size = 100;
+        }
 
-        _server->write(_temperature_characteristic->getValueHandle(), temp_array, 4);
+        uint8_t bytearray[208] = {0};
+        uint64_t timestamp = data_timestamp;
+        std::memcpy(bytearray, &timestamp, 8);
+
+        uint32_t tmp_frequency = measurement_frequencyx100;
+        std::memcpy(&bytearray[8], &tmp_frequency, 4);
+
+        uint8_t num_samples = size;
+        std::memcpy(&bytearray[12], &num_samples, 1);
+
+        for (int i = 0; i < size; i++)
+        {
+            bytearray[13 + i*2] = (uint8_t)((temperature_array[i] >> 8) & 0xFF);
+            bytearray[13 + (i*2)+1] = (uint8_t)(temperature_array[i] & 0xFF);
+        }
+        _server->write(_temperature_characteristic->getValueHandle(), bytearray, (size * 2) + 13);
+    }
+
+    void updateDataReady(bool ready)
+    {
+        uint8_t tmp = ready;
+        _server->write(_air_quality_characteristic->getValueHandle(), &tmp, 1);
     }
 
 private:
     GattServer* _server = nullptr;
 
-    ReadOnlyGattCharacteristic<uint32_t>* _pressure_characteristic = nullptr;
-    ReadOnlyGattCharacteristic<uint32_t>* _temperature_characteristic = nullptr;
+    ReadOnlyArrayGattCharacteristic<uint8_t, 208>* _pressure_characteristic = nullptr;
+    ReadOnlyArrayGattCharacteristic<uint8_t, 208>* _temperature_characteristic = nullptr;
     ReadOnlyGattCharacteristic<uint16_t>* _air_quality_characteristic = nullptr;
     ReadOnlyGattCharacteristic<uint16_t>* _imu_characteristic = nullptr;
     ReadOnlyGattCharacteristic<uint16_t>* _mag_characteristic = nullptr;
     ReadOnlyGattCharacteristic<uint16_t>* _mic_characteristic = nullptr;
 
+    uint8_t _initial_value_uint8_t = 0;
     uint16_t _initial_value_uint16_t = 0;
     uint32_t _initial_value_uint32_t = 0;
 };
