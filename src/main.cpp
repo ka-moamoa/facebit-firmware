@@ -30,10 +30,10 @@
 
 #include "SmartPPEService.h"
 
-const int LED_ENERGY = 1;
-const int SENSING_ENERGY = 1;
+const int LED_ENERGY = 0.001;//1mJ
+const int SENSING_ENERGY = 1;//1mJ
 
-const bool RUN_LED = true;
+const bool RUN_LED = false;
 const bool RUN_SENSING =false;
 
 LowPowerTicker ticker1,ticker2;
@@ -107,8 +107,11 @@ int main()
     // BLE &ble = BLE::Instance();
     // SmartPPEService smart_ppe_ble;
 
-    ticker1.attach(led_thread, 1000ms);
-    ticker2.attach(sensor_thread,1000ms /*callback(sensor_thread, &smart_ppe_ble)*/);
+    float cap_voltage = cap.read_capacitor_voltage();
+    int i=0;
+
+    //ticker1.attach(led_thread, 1000ms);
+    //ticker2.attach(sensor_thread,1000ms /*callback(sensor_thread, &smart_ppe_ble)*/);
 
     // GattServerProcess ble_process(event_queue, ble);
     // ble_process.on_init(callback(&smart_ppe_ble, &SmartPPEService::start));
