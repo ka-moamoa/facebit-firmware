@@ -14,25 +14,27 @@
  * limitations under the License.
  */
 
-#include "gatt_server_process.h"
 
-#include "PinNames.h"
 #include "mbed.h"
 
+#include "gatt_server_process.h"
+#include "PinNames.h"
 #include "SPI.h"
 #include "I2C.h"
 #include "SWO.h"
 #include "SWOLogger.h"
-
 #include "BusControl.h"
 #include "Barometer.hpp"
-
+#include "Config.h"
 #include "SmartPPEService.h"
 
+// Frequency configuration of each task
+ const std::chrono::milliseconds LED_TASK= 1000ms;
+ const std::chrono::milliseconds SENSING_TASK= 1000ms;
 
 
-DigitalOut led(LED1);
-BusControl *bus_control = BusControl::get_instance();
+ DigitalOut led(LED1);
+ BusControl *bus_control = BusControl::get_instance();
 
 SWO_Channel SWO; // for SWO logging
 I2C i2c(I2C_SDA0, I2C_SCL0);
@@ -49,15 +51,17 @@ static events::EventQueue event_queue(/* event count */ 16 * EVENTS_EVENT_SIZE);
 Thread thread1;
 Thread thread2;
 
+LowPowerTicker lp_ticker_led,lp_ticker_sensor;
 void led_thread()
 {
-    while(1)
+    led = !led;
+   /* while(1)
     {
         led = 0;
         ThisThread::sleep_for(1000ms);
         led = 1;
         ThisThread::sleep_for(10ms);
-    }
+    }*/
 }
 
 void sensor_thread(/*SmartPPEService* smart_ppe_service*/)
@@ -97,12 +101,13 @@ int main()
     // BLE &ble = BLE::Instance();
     // SmartPPEService smart_ppe_ble;
 
-    thread1.start(led_thread);
-    thread2.start(sensor_thread/*callback(sensor_thread, &smart_ppe_ble)*/);
-
+    //thread1.start(led_thread);
+    lp_ticker_led.attach(&led_thread,LED_TASK);
+    //thread2.start(sensor_thread/*callback(sensor_thread, &smart_ppe_ble)*/);
+    lp_ticker_sensor.attach(&sensor_thread,SENSING_TASK);
+   
     // GattServerProcess ble_process(event_queue, ble);
     // ble_process.on_init(callback(&smart_ppe_ble, &SmartPPEService::start));
-
     // ble_process.start();
 
     return 0;

@@ -2,7 +2,8 @@
     "target_overrides": {
         "SMARTPPE": {
             "target.features_add": ["BLE"],
-            "target.printf_lib": "std"
-        }
+            "target.printf_lib": "std",
+            "events.use-lowpower-timer-ticker": true           
+            }
     }
 }
