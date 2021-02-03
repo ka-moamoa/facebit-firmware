@@ -41,7 +41,7 @@ private:
     bool _high_pressure_event_flag = false;
     uint16_t _max_buffer_size = 96; // by default
     uint64_t _drdy_timestamp;
-    uint64_t _last_timestamp;
+    uint64_t _last_timestamp = 0;
     uint32_t _measurement_frequencyx100;
 
     BusControl *_bus_control;
