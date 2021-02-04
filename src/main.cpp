@@ -49,6 +49,7 @@ Thread *thread1;
 Thread *thread2;
 
 Timer timer;
+Timer timer2;
 
 // SmartPPEService smart_ppe_ble;
 
@@ -136,20 +137,26 @@ int main()
     imu.enable_g();
 
     timer.start();
+    timer2.start();
+    const int sample_rate = 100; // Hz
+    float sample_period = 1.0 / sample_rate;
 
     printf("acc X, acc Y, acc Z, gyr X, gyr Y, gyr Z, TS\r\n");
 
     while(1)
     {
-        float acc[3] = {0};
-        imu.get_x_axes_f(acc);
+        if (timer.read() >= sample_period)        
+        {
+            float acc[3] = {0};
+            imu.get_x_axes_f(acc);
 
-        float gyr[3] = {0};
-        imu.get_g_axes_f(gyr);
+            float gyr[3] = {0};
+            imu.get_g_axes_f(gyr);
 
-        printf("%f, %f, %f, %f, %f, %f, %f\r\n", acc[0], acc[1], acc[2], gyr[0], gyr[1], gyr[2], timer.read());
-
-        // ThisThread::sleep_for(s);
+            printf("%f, %f, %f, %f, %f, %f, %f\r\n", acc[0], acc[1], acc[2], gyr[0], gyr[1], gyr[2], timer2.read());
+            
+            timer.reset();
+        }
     }
 
 
