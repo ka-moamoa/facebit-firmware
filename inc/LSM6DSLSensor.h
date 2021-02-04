@@ -131,6 +131,8 @@ class LSM6DSLSensor : public MotionSensor, public GyroSensor
     LSM6DSLSensor(DevI2C *i2c, uint8_t address=LSM6DSL_ACC_GYRO_I2C_ADDRESS_HIGH, PinName INT1_pin=NC, PinName INT2_pin=NC);
     virtual int init(void *init);
     virtual int read_id(uint8_t *id);
+    int get_x_axes_f(float *pData);
+    int get_g_axes_f(float *pData);
     virtual int get_x_axes(int32_t *pData);
     virtual int get_g_axes(int32_t *pData);
     virtual int get_x_sensitivity(float *pfData);
