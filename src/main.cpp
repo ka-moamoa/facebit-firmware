@@ -118,8 +118,9 @@ void sensor_thread(/*SmartPPEService* smart_ppe_service*/)
         }
     }*/
 }
-Event<void()> event1(&event_queue, led_thread);
-Event<void()> event2(&event_queue, sensor_thread);
+//Event<void()> event1(&event_queue, led_thread);
+//Event<void()> event2(&event_queue, sensor_thread);
+
 void t1(){
     event_queue.call(led_thread);
     //led_thread(); 
