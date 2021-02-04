@@ -33,6 +33,7 @@ THE SOFTWARE.
 #include "LowPowerTimer.h"
 #include "I2C.h"
 #include "SWOLogger.h"
+#include "Utilites.h"
 
 Si7051::Si7051(I2C *i2c, char address)
 {
@@ -41,7 +42,9 @@ Si7051::Si7051(I2C *i2c, char address)
 }
 
 void Si7051::initialize() {
-	setResolution(14);
+	setResolution(12);
+	_timer.reset();
+	_timer.start();
 }
 
 void Si7051::reset()
@@ -54,6 +57,9 @@ void Si7051::reset()
 	if (!ack) { LOG_WARNING("%s", "nack reset cmd stage") };
 
 	_i2c->stop();
+
+	_timer.reset();
+	_timer.start();
 }
 
 uint8_t Si7051::readFirmwareVersion()
@@ -152,5 +158,25 @@ float Si7051::readTemperature()
 	uint16_t val = msb << 8 | lsb;
 
 	return (175.72*val) / 65536 - 46.85;
+}
+
+void Si7051::update()
+{
+	float measurement_period = 1.0 / (float)_measurement_frequency_hz;
+
+	if (_timer.read() >= measurement_period)
+	{
+		float tempVal = readTemperature();
+		uint16_t tempValx100 = (uint16_t)Utilities::round(tempVal * 100.0);
+		_tempx100_array.push_back(tempValx100);
+
+		if (_tempx100_array.size() > MAX_BUFFER_SIZE)
+		{
+			_tempx100_array.erase(_tempx100_array.begin());
+		}
+
+		_last_measurement_timestamp = _timer.read_ms();
+		_timer.reset();
+	}
 }
 

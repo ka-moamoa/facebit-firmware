@@ -26,6 +26,7 @@
 
 #include "BusControl.h"
 #include "Barometer.hpp"
+#include "Si7051.h"
 
 #include "SmartPPEService.h"
 
@@ -36,6 +37,9 @@ SWO_Channel SWO; // for SWO logging
 I2C i2c(I2C_SDA0, I2C_SCL0);
 SPI spi(SPI_MOSI, SPI_MISO, SPI_SCK);
 
+Si7051 temp(&i2c);
+Barometer barometer(&spi, BAR_CS, BAR_DRDY);
+
 SWO_Channel swo("channel");
 
 using namespace std::literals::chrono_literals;
@@ -43,6 +47,7 @@ using namespace std::literals::chrono_literals;
 const static char DEVICE_NAME[] = "SMARTPPE";
 
 static events::EventQueue event_queue(16 * EVENTS_EVENT_SIZE);
+
 
 Thread *thread1;
 Thread *thread2;
@@ -56,21 +61,20 @@ void led_thread()
         led = 0;
         ThisThread::sleep_for(2000ms);
         led = 1;
-        ThisThread::sleep_for(5ms);
+        ThisThread::sleep_for(10ms);
     }
 }
 
 void sensor_thread()
 {   
-    ThisThread::sleep_for(10ms);
-
-    bus_control->init();
     bus_control->spi_power(true);
-
-    Barometer barometer(&spi, BAR_CS, BAR_DRDY);
     spi.frequency(5000000);
 
-    ThisThread::sleep_for(10ms);
+    bus_control->i2c_power(true);
+
+    ThisThread::sleep_for(1000ms);
+
+    temp.initialize();
     
     if (!barometer.initialize() || !barometer.set_fifo_full_interrupt(true))
     {
@@ -86,32 +90,52 @@ void sensor_thread()
 
     while(1)
     {
-        if (barometer.update())
+        barometer.update();
+        temp.update();
+
+        if (barometer.get_buffer_full())
         {
-            if (barometer.get_buffer_full())
-            {
-                LOG_DEBUG("buffer full. %u elements. timestamp = %llu. measurement frequency x100 = %lu", barometer.get_pressure_buffer_size(), barometer.get_drdy_timestamp(), barometer.get_measurement_frequencyx100());
-                smart_ppe_ble.updatePressure(
-                    barometer.get_drdy_timestamp(), 
-                    barometer.get_measurement_frequencyx100(), 
-                    barometer.get_pressure_array(), 
-                    barometer.get_pressure_buffer_size());
-                smart_ppe_ble.updateTemperature(
-                    barometer.get_drdy_timestamp(), 
-                    barometer.get_measurement_frequencyx100(),
-                    barometer.get_temperature_array(), 
-                    barometer.get_temp_buffer_size());
-                smart_ppe_ble.updateDataReady(true);
-                barometer.clear_buffers();
-            }
+            LOG_DEBUG("barometer buffer full. %u elements. timestamp = %llu. measurement frequency x100 = %lu", barometer.get_pressure_buffer_size(), barometer.get_drdy_timestamp(), barometer.get_measurement_frequencyx100());
+            
+            smart_ppe_ble.updatePressure(
+                barometer.get_drdy_timestamp(), 
+                barometer.get_measurement_frequencyx100(), 
+                barometer.get_pressure_array(), 
+                barometer.get_pressure_buffer_size());
+            
+            smart_ppe_ble.updateDataReady(smart_ppe_ble.PRESSURE);
+
+
+            barometer.clear_buffers();
         }
-        ThisThread::sleep_for(200ms);
+
+        if (temp.getBufferFull())
+        {
+            uint16_t measurement_frequencyx100 = temp.getFrequency() * 100.0;
+
+            LOG_DEBUG("temperature buffer full. %u elements. timestamp = %lu. measurement frequency x100 = %u", temp.getBufferSize(), temp.getLastMeasurementTimestamp(), measurement_frequencyx100);
+
+            smart_ppe_ble.updateTemperature(
+                temp.getLastMeasurementTimestamp(), 
+                measurement_frequencyx100,
+                temp.getBuffer(),
+                temp.getBufferSize());
+
+            smart_ppe_ble.updateDataReady(smart_ppe_ble.TEMPERATURE);
+
+            temp.clearBuffer();
+        }
+
+        ThisThread::sleep_for(1ms);
     }
 }
 
 int main()
 {
     swo.claim();
+
+    bus_control->init();
+    ThisThread::sleep_for(10ms);
 
     thread1 = new Thread(osPriorityNormal, 512);
     thread2 = new Thread();

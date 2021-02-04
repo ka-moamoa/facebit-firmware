@@ -4,7 +4,6 @@
 #include "LPS22HBSensor.h"
 #include "SWOLogger.h"
 #include "BusControl.h"
-#include <queue>
 
 class Barometer
 {

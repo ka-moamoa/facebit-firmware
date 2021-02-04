@@ -9,17 +9,29 @@ class SmartPPEService : ble::GattServer::EventHandler {
 
     const char* PRESSURE_UUID = "0F1F34A3-4567-484C-ACA2-CC8F662E8781";
     const char* TEMPERATURE_UUID = "0F1F34A3-4567-484C-ACA2-CC8F662E8782";
-    const char* AIR_QUALITY_UUID = "0F1F34A3-4567-484C-ACA2-CC8F662E8783";
+    const char* DATA_READY_UUID = "0F1F34A3-4567-484C-ACA2-CC8F662E8783";
     const char* MAGNETOMETER_UUID = "0F1F34A3-4567-484C-ACA2-CC8F662E8784";
     const char* IMU_UUID = "0F1F34A3-4567-484C-ACA2-CC8F662E8785";
     const char* MICROPHONE_UUID = "0F1F34A3-4567-484C-ACA2-CC8F662E8786";
 
 public:
+    enum data_ready_t
+    {
+        PRESSURE = 1,
+        TEMPERATURE = 2,
+        ACCELEROMETER = 3,
+        RESPIRATORY_RATE = 4,
+        MASK_FIT = 5,
+        COUGH_SAMPLE = 6,
+        HEART_RATE = 7,
+        NO_DATA = 8
+    };
+
     SmartPPEService()
     {
         const UUID pressure_uuid(PRESSURE_UUID);
         const UUID temp_uuid(TEMPERATURE_UUID);
-        const UUID air_q_uuid(AIR_QUALITY_UUID);
+        const UUID data_ready_uuid(DATA_READY_UUID);
         const UUID mag_uuid(MAGNETOMETER_UUID);
         const UUID imu_uuid(IMU_UUID);
         const UUID mic_uuid(MICROPHONE_UUID);
@@ -34,9 +46,9 @@ public:
             printf("Allocation of temperature characteristic failed\r\n");
         }
 
-        _air_quality_characteristic = new ReadOnlyGattCharacteristic<uint16_t> (air_q_uuid, &_initial_value_uint16_t, GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_NOTIFY);
-        if (!_air_quality_characteristic) {
-            printf("Allocation of air quality characteristic failed\r\n");
+        _data_ready_characteristic = new ReadOnlyGattCharacteristic<uint8_t> (data_ready_uuid, &_initial_value_uint8_t, GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_NOTIFY);
+        if (!_data_ready_characteristic) {
+            printf("Allocation of data quality characteristic failed\r\n");
         }
 
         _mag_characteristic = new ReadOnlyGattCharacteristic<uint16_t> (mag_uuid, &_initial_value_uint16_t, GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_NOTIFY);
@@ -65,7 +77,7 @@ public:
         GattCharacteristic* charTable[] = { 
             _pressure_characteristic,  
             _temperature_characteristic,
-            _air_quality_characteristic,
+            _data_ready_characteristic,
             _mag_characteristic,
             _imu_characteristic,
             _mic_characteristic };
@@ -130,10 +142,10 @@ public:
         _server->write(_temperature_characteristic->getValueHandle(), bytearray, (size * 2) + 13);
     }
 
-    void updateDataReady(bool ready)
+    void updateDataReady(data_ready_t type)
     {
-        uint8_t tmp = ready;
-        _server->write(_air_quality_characteristic->getValueHandle(), &tmp, 1);
+        uint8_t tmp = (uint8_t)type;
+        _server->write(_data_ready_characteristic->getValueHandle(), &tmp, 1);
     }
 
 private:
@@ -141,7 +153,7 @@ private:
 
     ReadOnlyArrayGattCharacteristic<uint8_t, 208>* _pressure_characteristic = nullptr;
     ReadOnlyArrayGattCharacteristic<uint8_t, 208>* _temperature_characteristic = nullptr;
-    ReadOnlyGattCharacteristic<uint16_t>* _air_quality_characteristic = nullptr;
+    ReadOnlyGattCharacteristic<uint8_t>* _data_ready_characteristic = nullptr;
     ReadOnlyGattCharacteristic<uint16_t>* _imu_characteristic = nullptr;
     ReadOnlyGattCharacteristic<uint16_t>* _mag_characteristic = nullptr;
     ReadOnlyGattCharacteristic<uint16_t>* _mic_characteristic = nullptr;
