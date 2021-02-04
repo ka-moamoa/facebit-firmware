@@ -35,7 +35,7 @@ CapCalc::~CapCalc()
 float CapCalc::read_capacitor_voltage()
 {
     _cap_voltage_en = 1;
-    //ThisThread::sleep_for(1ms);
+    ThisThread::sleep_for(1ms);
 
     float voltage = _cap_voltage.read_voltage() * 2.80; // 2.80 is a factor that arises from the voltage divider
     

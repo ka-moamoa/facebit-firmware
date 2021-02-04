@@ -29,16 +29,17 @@
 #include "Barometer.hpp"
 
 #include "SmartPPEService.h"
+#define CHECK_VOLTAGE_FLAG (0)
 
-const int LED_ENERGY = 1;
-const int SENSING_ENERGY = 1;
+const int LED_ENERGY = 0.001;
+const int SENSING_ENERGY = 0.001;
 
 const bool RUN_LED = false;
-const bool RUN_SENSING =false;
+const bool RUN_SENSING = false;
 
-LowPowerTicker ticker1,ticker2;
+LowPowerTicker ticker1, ticker2;
 CapCalc cap(VCAP, VCAP_ENABLE, 3000);
-float available_energy = 0;
+float available_energy = 100;
 
 DigitalOut led(LED1);
 BusControl *bus_control = BusControl::get_instance();
@@ -53,44 +54,45 @@ using namespace std::literals::chrono_literals;
 
 const static char DEVICE_NAME[] = "SMARTPPE";
 
-
 static events::EventQueue event_queue(/* event count */ 16 * EVENTS_EVENT_SIZE);
 
 Mutex stdio_mutex;
 Thread thread1;
 Thread thread2;
+EventFlags event_flags;
+float cap_voltage = 4.8;
 
-float cap_voltage;
-//int t1=0;t2=0;
+
 void check_voltage()
 {
-    available_energy = cap.calc_joules();
-    cap_voltage = cap.read_capacitor_voltage();
+    // uint32_t flag_read = 0;
+    // while (1)
+    // {
+    //     flag_read = event_flags.wait_any(CHECK_VOLTAGE_FLAG,0);
+    //     //led=1;
+         available_energy = cap.calc_joules();
+         cap_voltage = cap.read_capacitor_voltage();
+    // }
 }
-
 
 void led_thread()
 {
-    //while(t2==1);
-    //t1=1;
+    check_voltage();
+    led = !led;
     
-    //check_voltage();
-    //available_energy = cap.calc_joules();
-    //if (RUN_LED || (available_energy > LED_ENERGY))
+    //event_flags.set(CHECK_VOLTAGE_FLAG);
+
+    if (RUN_LED || (available_energy > LED_ENERGY))
     {
-        led = 1;
     }
-    //t1=0;
 }
 void sensor_thread(/*SmartPPEService* smart_ppe_service*/)
 {
-    //available_energy = cap.calc_joules();
-    //while(t2==0);
-    //t1=1;
-    //check_voltage();
-    led = 0;
-    /*if(RUN_SENSING || (available_energy > SENSING_ENERGY && cap_voltage > 2.3))
+    check_voltage();
+    //led = !led;
+    if (RUN_SENSING || (available_energy > SENSING_ENERGY && cap_voltage > 2.3))
     {
+
         ThisThread::sleep_for(10ms);
         bus_control->init();
 
@@ -116,37 +118,40 @@ void sensor_thread(/*SmartPPEService* smart_ppe_service*/)
                 printf("pressure[%i] = %f, temperature[%i] = %f\r\n", i, pressure_data[i], i, temperature_data[i]);
             }
         }
-    }*/
+    }
 }
 //Event<void()> event1(&event_queue, led_thread);
 //Event<void()> event2(&event_queue, sensor_thread);
 
-void t1(){
+void t1()
+{
     event_queue.call(led_thread);
-    //led_thread(); 
+    //led_thread();
     //thread1.start(led_thread);
 }
-void t2(){
+void t2()
+{
     //sensor_thread();
-    event_queue.call(sensor_thread); 
+    event_queue.call(sensor_thread);
 }
 int main()
 {
-    //swo.claim();
+    swo.claim();
     // BLE &ble = BLE::Instance();
     // SmartPPEService smart_ppe_ble;
     //printf("Hello\n\r");
-   
+
     //event1.delay(1000ms);
     //event1.period(1000ms);
 
     //event2.delay(1000ms);
     //event2.period(1000ms);
-    ticker2.attach(t2,1000ms);
-    ticker1.attach(t1,1000ms);
-    
+    ticker2.attach(t1, 1000ms);
+    ticker1.attach(t2, 1000ms);
+
+    //thread1.start(check_voltage);
     //fflush(stdout);
-    thread1.start(callback(&event_queue, &EventQueue::dispatch_forever));
+    thread2.start(callback(&event_queue, &EventQueue::dispatch_forever));
     //event_queue.dispatch();
     //GattServerProcess ble_process(event_queue, ble);
     //ble_process.on_init(callback(&smart_ppe_ble, &SmartPPEService::start));
