@@ -60,39 +60,28 @@ Mutex stdio_mutex;
 Thread thread1;
 Thread thread2;
 EventFlags event_flags;
-float cap_voltage = 4.8;
+float cap_voltage = 0;
 
 
 void check_voltage()
 {
-    // uint32_t flag_read = 0;
-    // while (1)
-    // {
-    //     flag_read = event_flags.wait_any(CHECK_VOLTAGE_FLAG,0);
-    //     //led=1;
-         available_energy = cap.calc_joules();
-         cap_voltage = cap.read_capacitor_voltage();
-    // }
+    available_energy = cap.calc_joules();
+    cap_voltage = cap.read_capacitor_voltage();
 }
 
 void led_thread()
 {
     check_voltage();
-    led = !led;
-    
-    //event_flags.set(CHECK_VOLTAGE_FLAG);
-
     if (RUN_LED || (available_energy > LED_ENERGY))
     {
+        led = !led;
     }
 }
 void sensor_thread(/*SmartPPEService* smart_ppe_service*/)
 {
     check_voltage();
-    //led = !led;
     if (RUN_SENSING || (available_energy > SENSING_ENERGY && cap_voltage > 2.3))
     {
-
         ThisThread::sleep_for(10ms);
         bus_control->init();
 
@@ -120,20 +109,16 @@ void sensor_thread(/*SmartPPEService* smart_ppe_service*/)
         }
     }
 }
-//Event<void()> event1(&event_queue, led_thread);
-//Event<void()> event2(&event_queue, sensor_thread);
 
 void t1()
 {
     event_queue.call(led_thread);
-    //led_thread();
-    //thread1.start(led_thread);
 }
 void t2()
 {
-    //sensor_thread();
     event_queue.call(sensor_thread);
 }
+
 int main()
 {
     swo.claim();
