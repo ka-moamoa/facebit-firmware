@@ -23,23 +23,14 @@
 #include "I2C.h"
 #include "SWO.h"
 #include "SWOLogger.h"
-<<<<<<< HEAD
 #include "CapCalc.h"
 
-=======
->>>>>>> 9e71adf8038c601f95dba6315a5eaba774ec2ac1
 #include "BusControl.h"
 #include "Barometer.hpp"
 #include "Config.h"
 #include "SmartPPEService.h"
 
-<<<<<<< HEAD
 const float MIN_VOLTAGE = 2.3;
-=======
-// Frequency configuration of each task
- const std::chrono::milliseconds LED_TASK= 1000ms;
- const std::chrono::milliseconds SENSING_TASK= 1000ms;
->>>>>>> 9e71adf8038c601f95dba6315a5eaba774ec2ac1
 
 const int LED_ENERGY = 0.001;
 const int SENSING_ENERGY = 0.001;
@@ -88,7 +79,6 @@ void check_voltage()
 LowPowerTicker lp_ticker_led,lp_ticker_sensor;
 void led_thread()
 {
-<<<<<<< HEAD
     check_voltage();
     printf("\r\nLED\r\n");
     if (RUN_LED || (available_energy > LED_ENERGY))
@@ -96,16 +86,6 @@ void led_thread()
         led = !led;
     }
     fflush(stdout);
-=======
-    led = !led;
-   /* while(1)
-    {
-        led = 0;
-        ThisThread::sleep_for(1000ms);
-        led = 1;
-        ThisThread::sleep_for(10ms);
-    }*/
->>>>>>> 9e71adf8038c601f95dba6315a5eaba774ec2ac1
 }
 void sensor_thread(/*SmartPPEService* smart_ppe_service*/)
 {
@@ -156,7 +136,6 @@ int main()
     swo.claim();
     // BLE &ble = BLE::Instance();
     // SmartPPEService smart_ppe_ble;
-<<<<<<< HEAD
     
     lp_ticker_led.attach(t1, 1000ms);
     lp_ticker_sensor.attach(t2, 1000ms);
@@ -167,16 +146,6 @@ int main()
     //event_queue.dispatch();
     //GattServerProcess ble_process(event_queue, ble);
     //ble_process.on_init(callback(&smart_ppe_ble, &SmartPPEService::start));
-=======
-
-    //thread1.start(led_thread);
-    lp_ticker_led.attach(&led_thread,LED_TASK);
-    //thread2.start(sensor_thread/*callback(sensor_thread, &smart_ppe_ble)*/);
-    lp_ticker_sensor.attach(&sensor_thread,SENSING_TASK);
-   
-    // GattServerProcess ble_process(event_queue, ble);
-    // ble_process.on_init(callback(&smart_ppe_ble, &SmartPPEService::start));
->>>>>>> 9e71adf8038c601f95dba6315a5eaba774ec2ac1
     // ble_process.start();
 
     return 0;
