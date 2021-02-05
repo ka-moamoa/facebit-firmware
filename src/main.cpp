@@ -29,7 +29,7 @@
 #include "Barometer.hpp"
 
 #include "SmartPPEService.h"
-#define CHECK_VOLTAGE_FLAG (0)
+
 
 const int LED_ENERGY = 0.001;
 const int SENSING_ENERGY = 0.001;
@@ -37,9 +37,14 @@ const int SENSING_ENERGY = 0.001;
 const bool RUN_LED = false;
 const bool RUN_SENSING = false;
 
-LowPowerTicker ticker1, ticker2;
+// Frequency configuration of each task
+ const std::chrono::milliseconds LED_TASK= 1000ms;
+ const std::chrono::milliseconds SENSING_TASK= 1000ms;
+
+LowPowerTicker lp_ticker_led,lp_ticker_sensor;
+
 CapCalc cap(VCAP, VCAP_ENABLE, 3000);
-float available_energy = 100;
+float available_energy = 0;
 
 DigitalOut led(LED1);
 BusControl *bus_control = BusControl::get_instance();
@@ -62,7 +67,6 @@ Thread thread2;
 EventFlags event_flags;
 float cap_voltage = 0;
 
-
 void check_voltage()
 {
     available_energy = cap.calc_joules();
@@ -72,14 +76,19 @@ void check_voltage()
 void led_thread()
 {
     check_voltage();
+    printf("\r\nLED\r\n");
+    printf("Voltage: %f\r\n",cap_voltage);
+    printf("Energy: %f\r\n",available_energy);
     if (RUN_LED || (available_energy > LED_ENERGY))
     {
         led = !led;
     }
+    fflush(stdout);
 }
 void sensor_thread(/*SmartPPEService* smart_ppe_service*/)
 {
     check_voltage();
+    printf("Sensing\n\r");
     if (RUN_SENSING || (available_energy > SENSING_ENERGY && cap_voltage > 2.3))
     {
         ThisThread::sleep_for(10ms);
@@ -108,6 +117,7 @@ void sensor_thread(/*SmartPPEService* smart_ppe_service*/)
             }
         }
     }
+    fflush(stdout);
 }
 
 void t1()
@@ -124,18 +134,12 @@ int main()
     swo.claim();
     // BLE &ble = BLE::Instance();
     // SmartPPEService smart_ppe_ble;
-    //printf("Hello\n\r");
-
-    //event1.delay(1000ms);
-    //event1.period(1000ms);
-
-    //event2.delay(1000ms);
-    //event2.period(1000ms);
-    ticker2.attach(t1, 1000ms);
-    ticker1.attach(t2, 1000ms);
+    
+    lp_ticker_led.attach(t1, 1000ms);
+    lp_ticker_sensor.attach(t2, 1000ms);
 
     //thread1.start(check_voltage);
-    //fflush(stdout);
+    
     thread2.start(callback(&event_queue, &EventQueue::dispatch_forever));
     //event_queue.dispatch();
     //GattServerProcess ble_process(event_queue, ble);
