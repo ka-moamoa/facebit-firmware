@@ -30,6 +30,7 @@
 
 #include "SmartPPEService.h"
 
+const float MIN_VOLTAGE = 2.3;
 
 const int LED_ENERGY = 0.001;
 const int SENSING_ENERGY = 0.001;
@@ -71,14 +72,14 @@ void check_voltage()
 {
     available_energy = cap.calc_joules();
     cap_voltage = cap.read_capacitor_voltage();
+    printf("\r\nVoltage: %f\r\n",cap_voltage);
+    printf("Energy: %f\r\n",available_energy);
 }
 
 void led_thread()
 {
     check_voltage();
     printf("\r\nLED\r\n");
-    printf("Voltage: %f\r\n",cap_voltage);
-    printf("Energy: %f\r\n",available_energy);
     if (RUN_LED || (available_energy > LED_ENERGY))
     {
         led = !led;
@@ -89,7 +90,7 @@ void sensor_thread(/*SmartPPEService* smart_ppe_service*/)
 {
     check_voltage();
     printf("Sensing\n\r");
-    if (RUN_SENSING || (available_energy > SENSING_ENERGY && cap_voltage > 2.3))
+    if (RUN_SENSING || (available_energy > SENSING_ENERGY && cap_voltage > MIN_VOLTAGE))
     {
         ThisThread::sleep_for(10ms);
         bus_control->init();
