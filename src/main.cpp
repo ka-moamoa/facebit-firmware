@@ -72,8 +72,8 @@ void check_voltage()
 {
     available_energy = cap.calc_joules();
     cap_voltage = cap.read_capacitor_voltage();
-    printf("\r\nVoltage: %f\r\n",cap_voltage);
-    printf("Energy: %f\r\n",available_energy);
+    printf("\r\nVoltage: %0.2f\r\n",cap_voltage);
+    printf("Energy: %0.2f\r\n",available_energy);
 }
 
 void led_thread()
