@@ -36,12 +36,12 @@ public:
         const UUID imu_uuid(IMU_UUID);
         const UUID mic_uuid(MICROPHONE_UUID);
 
-        _pressure_characteristic = new ReadOnlyArrayGattCharacteristic<uint8_t, 208> (pressure_uuid, &_initial_value_uint8_t);
+        _pressure_characteristic = new ReadOnlyArrayGattCharacteristic<uint8_t, 213> (pressure_uuid, &_initial_value_uint8_t);
         if (!_pressure_characteristic) {
             printf("Allocation of pressure characteristic failed\r\n");
         }
 
-        _temperature_characteristic = new ReadOnlyArrayGattCharacteristic<uint8_t, 208> (temp_uuid, &_initial_value_uint8_t);
+        _temperature_characteristic = new ReadOnlyArrayGattCharacteristic<uint8_t, 213> (temp_uuid, &_initial_value_uint8_t);
         if (!_temperature_characteristic) {
             printf("Allocation of temperature characteristic failed\r\n");
         }
@@ -151,8 +151,8 @@ public:
 private:
     GattServer* _server = nullptr;
 
-    ReadOnlyArrayGattCharacteristic<uint8_t, 208>* _pressure_characteristic = nullptr;
-    ReadOnlyArrayGattCharacteristic<uint8_t, 208>* _temperature_characteristic = nullptr;
+    ReadOnlyArrayGattCharacteristic<uint8_t, 213>* _pressure_characteristic = nullptr;
+    ReadOnlyArrayGattCharacteristic<uint8_t, 213>* _temperature_characteristic = nullptr;
     ReadOnlyGattCharacteristic<uint8_t>* _data_ready_characteristic = nullptr;
     ReadOnlyGattCharacteristic<uint16_t>* _imu_characteristic = nullptr;
     ReadOnlyGattCharacteristic<uint16_t>* _mag_characteristic = nullptr;
