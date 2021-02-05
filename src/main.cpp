@@ -111,9 +111,9 @@ void sensor_thread()
 
         if (temp.getBufferFull())
         {
-            uint16_t measurement_frequencyx100 = temp.getFrequency() * 100.0;
+            uint32_t measurement_frequencyx100 = temp.getFrequency() * 100.0;
 
-            LOG_DEBUG("temperature buffer full. %u elements. timestamp = %lu. measurement frequency x100 = %u", temp.getBufferSize(), temp.getLastMeasurementTimestamp(), measurement_frequencyx100);
+            LOG_DEBUG("temperature buffer full. %u elements. timestamp = %llu. measurement frequency x100 = %lu", temp.getBufferSize(), temp.getLastMeasurementTimestamp(), measurement_frequencyx100);
 
             smart_ppe_ble.updateTemperature(
                 temp.getLastMeasurementTimestamp(), 

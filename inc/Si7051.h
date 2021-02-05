@@ -69,14 +69,14 @@ public:
 	void clearBuffer() { _tempx100_array.clear(); };
 	uint8_t getBufferSize() { return _tempx100_array.size(); };
 	uint16_t* getBuffer() { return _tempx100_array.data(); };
-	uint32_t getLastMeasurementTimestamp() { return _last_measurement_timestamp; };
+	uint64_t getLastMeasurementTimestamp() { return _last_measurement_timestamp; };
 private:
 	uint8_t _address;
 	I2C *_i2c;
 	std::vector<uint16_t> _tempx100_array;
 	uint8_t _measurement_frequency_hz = 20; // Hz
 	LowPowerTimer _timer;
-	uint32_t _last_measurement_timestamp = 0;
+	uint64_t _last_measurement_timestamp = 0;
 
 	const char MEASURE_HOLD = 0xE3;
 	const char MEASURE_NOHOLD = 0xF3;
