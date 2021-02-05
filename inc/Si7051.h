@@ -80,6 +80,7 @@ private:
 	uint64_t _relative_measurement_timestamp = 0;
 	uint64_t _last_measurement_timestamp = 0;
 	uint64_t _last_broadcast_timestamp = 0;
+	uint32_t _actual_frequencyx100 = 0;
 
 	const char MEASURE_HOLD = 0xE3;
 	const char MEASURE_NOHOLD = 0xF3;

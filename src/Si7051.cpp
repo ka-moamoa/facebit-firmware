@@ -190,6 +190,8 @@ uint64_t Si7051::getDeltaTimestamp(bool broadcast)
 	uint64_t delta_t = _last_measurement_timestamp - _last_broadcast_timestamp;
 	if (broadcast)
 	{
+		float actual_frequency = 1000.0 * (float)getBufferSize() / (float) delta_t;
+		_actual_frequencyx100 = Utilities::round(actual_frequency * 100.0);
 		_last_broadcast_timestamp = _last_measurement_timestamp;
 	}
 
@@ -198,10 +200,6 @@ uint64_t Si7051::getDeltaTimestamp(bool broadcast)
 
 uint32_t Si7051::getFrequencyx100()
 {
-	float buf_size = (float)getBufferSize();
-	float delta_t = (float)getDeltaTimestamp(false);
-	float frequency = 1000.0 * buf_size / delta_t;
-	
-	return Utilities::round(frequency * 100);
+	return _actual_frequencyx100;
 }
 
