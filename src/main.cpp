@@ -95,10 +95,10 @@ void sensor_thread()
 
         if (barometer.get_buffer_full())
         {
-            LOG_DEBUG("barometer buffer full. %u elements. timestamp = %llu. measurement frequency x100 = %lu", barometer.get_pressure_buffer_size(), barometer.get_drdy_timestamp(), barometer.get_measurement_frequencyx100());
+            // LOG_DEBUG("barometer buffer full. %u elements. timestamp = %llu. measurement frequency x100 = %lu", barometer.get_pressure_buffer_size(), barometer.get_delta_timestamp(), barometer.get_measurement_frequencyx100());
             
             smart_ppe_ble.updatePressure(
-                barometer.get_drdy_timestamp(), 
+                barometer.get_delta_timestamp(), 
                 barometer.get_measurement_frequencyx100(), 
                 barometer.get_pressure_array(), 
                 barometer.get_pressure_buffer_size());
@@ -111,13 +111,11 @@ void sensor_thread()
 
         if (temp.getBufferFull())
         {
-            uint32_t measurement_frequencyx100 = temp.getFrequency() * 100.0;
-
-            LOG_DEBUG("temperature buffer full. %u elements. timestamp = %llu. measurement frequency x100 = %lu", temp.getBufferSize(), temp.getLastMeasurementTimestamp(), measurement_frequencyx100);
+            LOG_DEBUG("temperature buffer full. %u elements. timestamp = %llu. measurement frequency x100 = %lu", temp.getBufferSize(), temp.getDeltaTimestamp(false), temp.getFrequencyx100());
 
             smart_ppe_ble.updateTemperature(
-                temp.getLastMeasurementTimestamp(), 
-                measurement_frequencyx100,
+                temp.getDeltaTimestamp(true), 
+                temp.getFrequencyx100(),
                 temp.getBuffer(),
                 temp.getBufferSize());
 

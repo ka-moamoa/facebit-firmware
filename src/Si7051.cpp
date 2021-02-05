@@ -43,6 +43,10 @@ Si7051::Si7051(I2C *i2c, char address)
 
 void Si7051::initialize() {
 	setResolution(12);
+
+	_frequency_timer.reset();
+	_frequency_timer.start();
+
 	_timer.reset();
 	_timer.start();
 }
@@ -164,7 +168,7 @@ void Si7051::update()
 {
 	float measurement_period = 1.0 / (float)_measurement_frequency_hz;
 
-	if (_timer.read() >= measurement_period)
+	if (_frequency_timer.read() >= measurement_period)
 	{
 		float tempVal = readTemperature();
 		uint16_t tempValx100 = (uint16_t)Utilities::round(tempVal * 100.0);
@@ -175,8 +179,29 @@ void Si7051::update()
 			_tempx100_array.erase(_tempx100_array.begin());
 		}
 
+		_relative_measurement_timestamp = _frequency_timer.read_ms();
 		_last_measurement_timestamp = _timer.read_ms();
-		_timer.reset();
+		_frequency_timer.reset();
 	}
+}
+
+uint64_t Si7051::getDeltaTimestamp(bool broadcast)
+{
+	uint64_t delta_t = _last_measurement_timestamp - _last_broadcast_timestamp;
+	if (broadcast)
+	{
+		_last_broadcast_timestamp = _last_measurement_timestamp;
+	}
+
+	return delta_t;
+}
+
+uint32_t Si7051::getFrequencyx100()
+{
+	float buf_size = (float)getBufferSize();
+	float delta_t = (float)getDeltaTimestamp(false);
+	float frequency = 1000.0 * buf_size / delta_t;
+	
+	return Utilities::round(frequency * 100);
 }
 
