@@ -95,10 +95,10 @@ void sensor_thread()
 
         if (barometer.get_buffer_full())
         {
-            // LOG_DEBUG("barometer buffer full. %u elements. timestamp = %llu. measurement frequency x100 = %lu", barometer.get_pressure_buffer_size(), barometer.get_delta_timestamp(), barometer.get_measurement_frequencyx100());
+            LOG_DEBUG("barometer buffer full. %u elements. timestamp = %llu. measurement frequency x100 = %lu", barometer.get_pressure_buffer_size(), barometer.get_delta_timestamp(false), barometer.get_measurement_frequencyx100());
             
             smart_ppe_ble.updatePressure(
-                barometer.get_delta_timestamp(), 
+                barometer.get_delta_timestamp(true), 
                 barometer.get_measurement_frequencyx100(), 
                 barometer.get_pressure_array(), 
                 barometer.get_pressure_buffer_size());

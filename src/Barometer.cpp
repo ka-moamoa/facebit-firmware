@@ -126,14 +126,24 @@ bool Barometer::set_pressure_threshold(int16_t hPa)
 
 void Barometer::bar_data_ready()
 {
-    uint64_t drdy_timestamp = duration_cast<milliseconds>(_t_barometer.elapsed_time()).count();
-    _delta_timestamp = drdy_timestamp - _last_timestamp;
-    _last_timestamp = drdy_timestamp;
+    _drdy_timestamp = duration_cast<milliseconds>(_t_barometer.elapsed_time()).count();
+    uint64_t delta_timestamp = _drdy_timestamp - _last_timestamp;
+    _last_timestamp = _drdy_timestamp;
     
-    float measurement_frequency = 1000 * (float)BAROMETER_FIFO_SIZE / ((float)_delta_timestamp);
+    float measurement_frequency = 1000 * (float)BAROMETER_FIFO_SIZE / ((float)delta_timestamp);
     _measurement_frequencyx100 = Utilities::round(measurement_frequency * 100);
 
     _bar_data_ready = true;
+}
+
+uint64_t Barometer::get_delta_timestamp(bool broadcast)
+{
+    uint64_t delta_t = _drdy_timestamp - _last_broadcast_timestamp;
+    if (broadcast)
+    {
+        _last_broadcast_timestamp = _drdy_timestamp;
+    }
+    return delta_t;
 }
 
 bool Barometer::read_buffered_data()
