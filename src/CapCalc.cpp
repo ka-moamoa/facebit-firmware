@@ -48,7 +48,7 @@ float CapCalc::calc_joules()
 {
     float voltage = read_capacitor_voltage();
 
-    float joules = 0.5 * ((float)_capacitance_uF / 1000000.0) * voltage * voltage;
+    float joules = 0.5 * ((float)_capacitance_uF / 1000000.0) * (voltage * voltage - 1.8*1.8);//the point at which the processor can run
 
     return joules;
 }
