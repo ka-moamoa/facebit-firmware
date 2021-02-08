@@ -924,6 +924,16 @@ int LSM6DSLSensor::set_g_fs(float fullScale)
   return 0;
 }
 
+int LSM6DSLSensor::enable_int1_drdy_g(void)
+{
+  if (LSM6DSL_ACC_GYRO_W_DRDY_G_on_INT1( (void *)this, LSM6DSL_ACC_GYRO_INT1_DRDY_G_ENABLED) == MEMS_ERROR)
+  {
+    return 1;
+  }
+
+  return 0;
+}
+
 /**
  * @brief  Enable free fall detection
  * @param pin the interrupt pin to be used

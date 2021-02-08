@@ -147,6 +147,7 @@ class LSM6DSLSensor : public MotionSensor, public GyroSensor
     virtual int get_g_fs(float *fullScale);
     virtual int set_x_fs(float fullScale);
     virtual int set_g_fs(float fullScale);
+    int enable_int1_drdy_g(void);
     int enable_x(void);
     int enable_g(void);
     int disable_x(void);
