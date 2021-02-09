@@ -94,6 +94,8 @@ void BCG::collect_data(uint16_t num_samples)
     }
 
     _bus_control->spi_power(false);
+    printf("done\r\n");
+    fflush(stdout);
 }
 
 uint8_t BCG::calc_hr()
@@ -185,7 +187,7 @@ void BCG::_l2norm(vector<float> &x, vector<float> &y, vector<float> &z, vector<f
     {
         float result = sqrt(x.front() * x.front() + y.front() * y.front() + z.front() * z.front());
 
-        // printf("result = %f, sizes: x = %u, y = %u, z = %u\r\n", result, x.size(), y.size(), z.size());
+        printf("result = %f, sizes: x = %u, y = %u, z = %u\r\n", result, x.size(), y.size(), z.size());
 
         x.erase(x.begin());
         y.erase(y.begin());

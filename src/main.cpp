@@ -18,7 +18,7 @@
 
 #include "PinNames.h"
 #include "mbed.h"
-
+#include "LowPowerTicker.h"
 #include "SPI.h"
 #include "SWO.h"
 #include "SWOLogger.h"
@@ -34,9 +34,9 @@ SPI spi(SPI_MOSI, SPI_MISO, SPI_SCK);
 SWO_Channel swo("channel");
 
 using namespace std::literals::chrono_literals;
-
-Thread *thread1;
-
+LowPowerTicker bcg_ticker;
+Thread *thread1,thread2;
+BCG bcg(&spi, IMU_INT1, IMU_CS);
 void led_thread()
 {
     while(1)
@@ -47,21 +47,31 @@ void led_thread()
         ThisThread::sleep_for(100ms);
     }
 }
+static events::EventQueue event_queue(/* event count */ 16 * EVENTS_EVENT_SIZE);
+void bcg_callback(){
+    bcg.collect_data(512 + 128);
+    bcg.calc_hr();
+}
 
+void t1()
+{
+    event_queue.call(&bcg_callback);
+}
+    
 int main()
 {
     swo.claim();
 
-    // printf("starting\r\n");
+
+    //printf("starting\r\n");
 
     thread1 = new Thread(osPriorityNormal, 512);
     thread1->start(led_thread);
 
-    BCG bcg(&spi, IMU_INT1, IMU_CS);
-
-    bcg.collect_data(512 + 128);
-    bcg.calc_hr();
-
+    bcg_ticker.attach(&t1,10000ms);
+   
+    thread2.start(callback(&event_queue, &EventQueue::dispatch_forever));
+    
     while(1)
     {
 
