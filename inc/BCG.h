@@ -5,7 +5,7 @@
 #include "LSM6DSLSensor.h"
 #include "BusControl.h"
 #include <vector>
-#include "fft.hpp"
+#include "../iir-filter-kit/BiQuad.h"
 
 class BCG
 {
@@ -13,29 +13,44 @@ public:
     BCG(SPI *spi, PinName int1_pin, PinName cs);
     ~BCG();
 
-    void collect_data(uint16_t num_samples);
-    uint8_t calc_hr();
-
+    float bcg(const uint16_t num_samples);
+    float get_frequency() { return G_FREQUENCY; }
 private:
     BusControl *_bus_control;
     SPI *_spi;
     DigitalIn _g_drdy;
     PinName _cs;
     LowPowerTimer _sample_timer;
-    FFT _fft;
 
-    vector<float> _g_x;
-    vector<float> _g_y;
-    vector<float> _g_z;
+    vector<float> _bcg;
 
-    std::chrono::seconds MIN_SAMPLE_DURATION = 5s; //seconds
-    uint16_t MIN_SAMPLES = 1024; // gives peak accuracy of 1.5 bpm
-    float G_FREQUENCY = 52.0;
-    float G_FULL_SCALE = 124.0;
+    float G_FREQUENCY = 104.0; // Hz
+    float G_FULL_SCALE = 124.0; // max sensitivity
 
-    void _step_1_filter(vector<float> &to_filter);
-    void _l2norm(vector<float> &x, vector<float> &y, vector<float> &z, vector<float> &l2norm);
-    void _step_2_filter(vector<float> &to_filter);
+    float BCG_STEP_DUR = 2.0; // seconds
+    float HR_STEP_DUR = 2.5; // seconds
+
+    double _l2norm(double x, double y, double z);
 };
 
 #endif //BCG_H_
+
+/*DINOSAURS
+   *                               *     _
+        /\     *            ___.       /  `)
+    *  //\\    /\          ///\\      / /
+      ///\\\  //\\/\      ////\\\    / /     /\
+     ////\\\\///\\/\\.-~~-.///\\\\  / /     //\\
+    /////\\\\///\\/         `\\\\\\/ /     ///\\
+   //////\\\\// /            `\\\\/ /     ////\\
+  ///////\\\\\//               `~` /\    /////\\
+ ////////\\\\\/      ,_____,   ,-~ \\\__//////\\\
+ ////////\\\\/  /~|  |/////|  |\\\\\\\\@//jro/\\
+ //<           / /|__|/////|__|///////~|~/////\\
+ ~~~     ~~   ` ~   ..   ~  ~    .     ~` `   '.
+ ~ _  -  -~.    .'   .`  ~ .,    '.    ~~ .  '*/
+
+
+// uint8_t calc_hr();
+
+// void _l2norm(vector<float> &x, vector<float> &y, vector<float> &z, vector<float> &l2norm);
