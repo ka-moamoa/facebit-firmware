@@ -34,9 +34,8 @@ SPI spi(SPI_MOSI, SPI_MISO, SPI_SCK);
 SWO_Channel swo("channel");
 
 using namespace std::literals::chrono_literals;
-LowPowerTicker bcg_ticker;
-Thread *thread1,thread2;
-BCG bcg(&spi, IMU_INT1, IMU_CS);
+// LowPowerTicker bcg_ticker;
+Thread t1;
 void led_thread()
 {
     while(1)
@@ -48,33 +47,28 @@ void led_thread()
     }
 }
 static events::EventQueue event_queue(/* event count */ 16 * EVENTS_EVENT_SIZE);
-void bcg_callback(){
-    bcg.collect_data(512 + 128);
-    bcg.calc_hr();
-}
+// void bcg_callback(){
+//     bcg.collect_data(256);
+//     bcg.calc_hr();
+// }
 
-void t1()
-{
-    event_queue.call(&bcg_callback);
-}
+// void t1()
+// {
+//     event_queue.call(&bcg, &BCG::calc_hr);
+// }
     
 int main()
 {
     swo.claim();
+    LOG_INFO("%s", "starting collection");
+    BCG bcg(&spi, IMU_INT1, IMU_CS);
 
+    t1.start(led_thread);
 
-    //printf("starting\r\n");
-
-    thread1 = new Thread(osPriorityNormal, 512);
-    thread1->start(led_thread);
-
-    bcg_ticker.attach(&t1,10000ms);
-   
-    thread2.start(callback(&event_queue, &EventQueue::dispatch_forever));
-    
     while(1)
     {
-
+        bcg.collect_data(256);
+        bcg.calc_hr();
     }
 
     return 0;

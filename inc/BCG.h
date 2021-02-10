@@ -13,7 +13,6 @@ public:
     BCG(SPI *spi, PinName int1_pin, PinName cs);
     ~BCG();
 
-    void collect_data(std::chrono::seconds num_seconds);
     void collect_data(uint16_t num_samples);
     uint8_t calc_hr();
 
@@ -30,7 +29,7 @@ private:
     vector<float> _g_z;
 
     std::chrono::seconds MIN_SAMPLE_DURATION = 5s; //seconds
-    uint16_t MIN_SAMPLES = 5 * 52;
+    uint16_t MIN_SAMPLES = 1024; // gives peak accuracy of 1.5 bpm
     float G_FREQUENCY = 52.0;
     float G_FULL_SCALE = 124.0;
 

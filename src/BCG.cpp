@@ -4,6 +4,7 @@
 #include "HRFilter.h"
 #include "math.h"
 #include <complex.h>
+#include "Utilites.h"
 
 using namespace std::chrono;
 
@@ -20,50 +21,9 @@ BCG::~BCG()
 {
 }
 
-void BCG::collect_data(seconds num_seconds)
-{
-    if (num_seconds < MIN_SAMPLE_DURATION)
-    {
-        LOG_WARNING("bcg interval less than suggested interval (%lli s)", MIN_SAMPLE_DURATION);
-    }
-
-    _bus_control->init();
-    _bus_control->spi_power(true);
-
-    _spi->frequency(8000000);
-
-    ThisThread::sleep_for(10ms);
-
-    LSM6DSLSensor imu(_spi, _cs);
-
-    imu.init(NULL);
-    imu.set_g_odr(G_FREQUENCY);
-    imu.set_g_fs(G_FULL_SCALE);
-    imu.enable_g();
-    imu.enable_int1_drdy_g();
-
-    ThisThread::sleep_for(500ms); // let gyroscope warm up
-
-    _sample_timer.start();
-
-    while(_sample_timer.elapsed_time() <= duration_cast<microseconds>(num_seconds))
-    {
-        if (_g_drdy.read())        
-        {
-            float gyr[3] = {0};
-            imu.get_g_axes_f(gyr);
-            _g_x.push_back(gyr[0]);
-            _g_y.push_back(gyr[1]);
-            _g_z.push_back(gyr[2]);           
-        }
-        ThisThread::sleep_for(5ms);
-    }
-    // LOG_DEBUG("%s", "BCG data collection complete");
-}
-
 void BCG::collect_data(uint16_t num_samples)
 {
-    _bus_control->init();
+     _bus_control->init();
     _bus_control->spi_power(true);
 
     _spi->frequency(8000000);
@@ -94,8 +54,6 @@ void BCG::collect_data(uint16_t num_samples)
     }
 
     _bus_control->spi_power(false);
-    printf("done\r\n");
-    fflush(stdout);
 }
 
 uint8_t BCG::calc_hr()
@@ -130,6 +88,9 @@ uint8_t BCG::calc_hr()
     // }
 
     _step_2_filter(l2norm);
+    _g_x.clear();
+    _g_y.clear();
+    _g_z.clear();
 
     // for (int i = 0; i < l2norm.size(); i++)
     // {
@@ -142,19 +103,30 @@ uint8_t BCG::calc_hr()
      */
 
     l2norm.erase(l2norm.begin(), l2norm.begin()+128);
-
-    printf("%u", l2norm.size());
+    l2norm.resize(MIN_SAMPLES, 0); // pad with zeros to interpolate
+    // printf("%u", l2norm.size());
 
     vector<complex<double>> fft;
     fft.resize(l2norm.size());
     _fft.fft(l2norm.data(), fft.data(), (uint16_t)l2norm.size());
 
+    float freq_resolution = 52.0 / (float)l2norm.size();
+    float max_val = 0.0;
+    float max_val_frequency = 0.0;
     for (int i = 0; i < fft.size() / 2; i++)
     {
-        printf("%f, %f\r\n", fft.at(i), 1.0/52.0 * fft.size() * (i+1));
+        float val = std::abs(fft.at(i));
+        if (val > max_val) 
+        {
+            max_val = val;
+            max_val_frequency = i * freq_resolution;
+        }
     }
 
-    return 1;
+    float HR = max_val_frequency * 60.0;
+    LOG_INFO("HR = %0.1f", HR);
+
+    return (uint8_t)Utilities::round(HR);
 }
 
 void BCG::_step_1_filter(vector<float> &to_filter)
@@ -187,7 +159,7 @@ void BCG::_l2norm(vector<float> &x, vector<float> &y, vector<float> &z, vector<f
     {
         float result = sqrt(x.front() * x.front() + y.front() * y.front() + z.front() * z.front());
 
-        printf("result = %f, sizes: x = %u, y = %u, z = %u\r\n", result, x.size(), y.size(), z.size());
+        // printf("result = %f, sizes: x = %u, y = %u, z = %u\r\n", result, x.size(), y.size(), z.size());
 
         x.erase(x.begin());
         y.erase(y.begin());

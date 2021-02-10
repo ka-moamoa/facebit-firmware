@@ -39,12 +39,15 @@ BusControl* BusControl::get_instance()
 
 void BusControl::init(void)
 {
-    NRF_GPIO->PIN_CNF[IMU_VCC] |= (GPIO_PIN_CNF_DRIVE_S0H1 << GPIO_PIN_CNF_DRIVE_Pos); // set to high drive mode
-    NRF_GPIO->PIN_CNF[TEMP_VCC] |= (GPIO_PIN_CNF_DRIVE_S0H1 << GPIO_PIN_CNF_DRIVE_Pos); // set to high drive mode
-    NRF_GPIO->PIN_CNF[BAR_VCC] |= (GPIO_PIN_CNF_DRIVE_S0H1 << GPIO_PIN_CNF_DRIVE_Pos); // set to high drive mode
-    NRF_GPIO->PIN_CNF[I2C_PULLUP] |= (GPIO_PIN_CNF_DRIVE_S0H1 << GPIO_PIN_CNF_DRIVE_Pos); // set to high drive mode
-    NRF_GPIO->PIN_CNF[FRAM_VCC] |= (GPIO_PIN_CNF_DRIVE_S0H1 << GPIO_PIN_CNF_DRIVE_Pos); // set to high drive mode
-    NRF_GPIO->PIN_CNF[MAG_VCC] |= (GPIO_PIN_CNF_DRIVE_S0H1 << GPIO_PIN_CNF_DRIVE_Pos); // set to high drive mode
+    if (!_initialized)
+    {
+        NRF_GPIO->PIN_CNF[IMU_VCC] |= (GPIO_PIN_CNF_DRIVE_S0H1 << GPIO_PIN_CNF_DRIVE_Pos); // set to high drive mode
+        NRF_GPIO->PIN_CNF[TEMP_VCC] |= (GPIO_PIN_CNF_DRIVE_S0H1 << GPIO_PIN_CNF_DRIVE_Pos); // set to high drive mode
+        NRF_GPIO->PIN_CNF[BAR_VCC] |= (GPIO_PIN_CNF_DRIVE_S0H1 << GPIO_PIN_CNF_DRIVE_Pos); // set to high drive mode
+        NRF_GPIO->PIN_CNF[I2C_PULLUP] |= (GPIO_PIN_CNF_DRIVE_S0H1 << GPIO_PIN_CNF_DRIVE_Pos); // set to high drive mode
+        NRF_GPIO->PIN_CNF[FRAM_VCC] |= (GPIO_PIN_CNF_DRIVE_S0H1 << GPIO_PIN_CNF_DRIVE_Pos); // set to high drive mode
+        NRF_GPIO->PIN_CNF[MAG_VCC] |= (GPIO_PIN_CNF_DRIVE_S0H1 << GPIO_PIN_CNF_DRIVE_Pos); // set to high drive mode
+    }
 
 
     _initialized = true;
@@ -57,6 +60,8 @@ void BusControl::spi_power(bool power)
         LOG_WARNING("%s", "Bus Control has not been initialized. Please run init().")
         return;
     }
+
+    if (get_spi_power() == true) return;
 
     _fram_vcc = power;
     _bar_vcc = power;
@@ -81,6 +86,8 @@ void BusControl::i2c_power(bool power)
         LOG_WARNING("%s", "Bus Control has not been initialized. Please run init().")
         return;
     }
+
+    if (get_i2c_power() == true) return;
 
     _temp_vcc = power;
     _voc_vcc = power;
