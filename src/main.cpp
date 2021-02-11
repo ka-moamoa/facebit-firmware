@@ -1,19 +1,3 @@
-/* mbed Microcontroller Library
- * Copyright (c) 2006-2015 ARM Limited
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 #include "gatt_server_process.h"
 
 #include "PinNames.h"
@@ -27,7 +11,7 @@
 #include "BusControl.h"
 #include "Barometer.hpp"
 #include "Si7051.h"
-#include "LowPowerTicker.h"
+
 #include "SmartPPEService.h"
 
 DigitalOut led(LED1);
@@ -49,11 +33,10 @@ const static char DEVICE_NAME[] = "SMARTPPE";
 static events::EventQueue task_queue(16 * EVENTS_EVENT_SIZE);
 
 // Frequency configuration of each task
-const std::chrono::milliseconds TIME_LED_TASK = 4000ms;
-const std::chrono::milliseconds TIME_RESP_TASK = 1000ms; //10mins
+const std::chrono::milliseconds LED_TASK = 1000ms;
+const std::chrono::milliseconds RESP_TASK = 120000ms; //10mins
 
 static events::EventQueue event_queue(/* event count */ 16 * EVENTS_EVENT_SIZE);
-
 LowPowerTicker lpt_led, lpt_resp_rate;
 
 float cap_voltage = 0;
@@ -62,37 +45,38 @@ CapCalc cap(VCAP, VCAP_ENABLE, 3000);
 float available_energy = 0;
 
 const float MIN_VOLTAGE = 2.3;
+
 const int LED_ENERGY = 0.001;
-const int RESP_RATE_ENERGY = 0.001;
+const int SENSING_ENERGY = 0.001;
 
 const bool RUN_LED = false;
-const bool RUN_RESP_RATE = false;
+const bool RUN_SENSING = false;
 
-//Thread *thread1, *thread2, *thread3;
-Thread thread1, thread2;
+Thread *thread1, *thread2, thread3;
 
 SmartPPEService smart_ppe_ble;
+
 void check_voltage()
 {
-    //printf("Checking Voltage...\n\r");
     available_energy = cap.calc_joules();
     cap_voltage = cap.read_capacitor_voltage();
-    printf("Voltage: %0.2f\r\n", cap_voltage);
-    printf("Energy: %0.2f\r\n", available_energy);
+    //printf("Voltage: %0.2f\r\n", cap_voltage);
+    //printf("Energy: %0.2f\r\n", available_energy);
 }
 
 void led_thread()
 {
     //while (1)
-    printf("LED-Start\r\n");
     check_voltage();
+    printf("LED\r\n");
     if (RUN_LED || (available_energy > LED_ENERGY))
     {
-        led = !led;
+        led = 1;
+        ThisThread::sleep_for(10ms);
+        led = 0;
     }
-    printf("LED-end\r\n");
-    check_voltage();
 }
+
 int calc_resp_rate(float samples[], int SAMPLE_SIZE, float mean)
 {
     int i = 1;
@@ -100,6 +84,7 @@ int calc_resp_rate(float samples[], int SAMPLE_SIZE, float mean)
     float local_max = 0;
     float max_average = 0;
     float delta = 0.5;
+    // printf("Breath Count %d\r\n",max_count);
     while (i < SAMPLE_SIZE)
     {
         if (samples[i] - mean > 0)
@@ -131,16 +116,20 @@ int calc_resp_rate(float samples[], int SAMPLE_SIZE, float mean)
     }
     return max_count;
 }
-
-void get_resp_rate_thread()
+void get_resp_rate()
 {
-    printf("Resp-start\r\n");
     check_voltage();
-    printf("Calculating Respitory Rate...\n\r");
-    if (RUN_RESP_RATE || (available_energy > RESP_RATE_ENERGY && cap_voltage > MIN_VOLTAGE))
+    printf("Resp Sensing\n\r");
+    if (RUN_SENSING || (available_energy > SENSING_ENERGY && cap_voltage > MIN_VOLTAGE))
     {
+        bus_control->spi_power(true);
+        spi.frequency(5000000);
 
+        bus_control->i2c_power(true);
+
+        ThisThread::sleep_for(1000ms);
         int resp_count = 0;
+        temp.initialize();
         //while (1)
         {
             //printf("Resp # %d", resp_count);
@@ -176,17 +165,19 @@ void get_resp_rate_thread()
                         temp.getFrequencyx100(),
                         temp.getBuffer(),
                         temp.getBufferSize());
+
                     smart_ppe_ble.updateDataReady(smart_ppe_ble.TEMPERATURE);
 
                     uint16_t *buffer = temp.getBuffer();
                     for (int j = 0; j < temp.getBufferSize(); j++)
                     {
-                        printf("Data %d\r\n", buffer[j]);
+                        //printf("Data %d\r\n", buffer[j]);
                         samples[i] = (buffer[j] / 100.0);
                         sum = sum + samples[i];
                         i++;
                     }
                     temp.clearBuffer();
+                    //printf("Data %d\r\n",sum);
                 }
                 ThisThread::sleep_for(50ms);
                 // convert to floating points
@@ -204,8 +195,6 @@ void get_resp_rate_thread()
             resp_count = resp_count + 1;
         }
     }
-    printf("Resp-end\r\n");
-    check_voltage();
 }
 void sensor_thread()
 {
@@ -233,8 +222,7 @@ void sensor_thread()
         {
         };
     }
-
-    while (1)
+    //while (1)
     {
         barometer.update();
         temp.update();
@@ -271,19 +259,21 @@ void sensor_thread()
         ThisThread::sleep_for(1ms);
     }
 }
-
 void t1()
 {
     task_queue.call(led_thread);
 }
 void t2()
 {
-    task_queue.call(get_resp_rate_thread);
+    task_queue.call(get_resp_rate);
 }
-void init_sensors()
+int main()
 {
+    swo.claim();
+
     bus_control->init();
     ThisThread::sleep_for(10ms);
+    
     bus_control->spi_power(true);
     spi.frequency(5000000);
 
@@ -291,7 +281,6 @@ void init_sensors()
 
     ThisThread::sleep_for(1000ms);
 
-    temp.initialize();
     if (!barometer.initialize() || !barometer.set_fifo_full_interrupt(true))
     {
         LOG_WARNING("%s", "barometer failed to initialize");
@@ -307,21 +296,21 @@ void init_sensors()
         {
         };
     }
-}
-int main()
-{
-    swo.claim();
+
+    thread1 = new Thread(osPriorityNormal, 512);
+    thread2 = new Thread();
+    //thread3 = new Thread();
 
     BLE &ble = BLE::Instance();
-    init_sensors();
-    //lpt_led.attach(t1, TIME_LED_TASK);
-    get_resp_rate_thread();
-    //lpt_resp_rate.attach(t2, TIME_RESP_TASK);
 
-    thread1.start(callback(&task_queue, &EventQueue::dispatch_forever));
-
+    //thread1->start(led_thread);
+    //thread2->start(get_resp_rate);
+    lpt_led.attach(t1, 4000ms);
+    lpt_resp_rate.attach(t2, 120000ms);
+    thread3.start(callback(&task_queue, &EventQueue::dispatch_forever));
     GattServerProcess ble_process(event_queue, ble);
     ble_process.on_init(callback(&smart_ppe_ble, &SmartPPEService::start));
+
     ble_process.start();
 
     return 0;
