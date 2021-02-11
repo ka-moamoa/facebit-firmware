@@ -17,6 +17,13 @@ BCG::~BCG()
 {
 }
 
+BCG::HR_t BCG::get_buffer_element()
+{
+    HR_t tmp = _HR.at(1);
+    _HR.erase(_HR.begin());
+    return tmp;
+}
+
 bool BCG::bcg(const seconds num_seconds)
 {
     // turn on SPI bus
@@ -141,11 +148,14 @@ bool BCG::bcg(const seconds num_seconds)
                     {
                         new_hr_reading = true;
 
+                        float rate_raw = Utilities::mean(crosses_copy);
+                        uint8_t rate = (uint8_t)Utilities::round(rate_raw);
+
                         HR_t new_hr;
-                        new_hr.rate = Utilities::mean(crosses_copy);
+                        new_hr.rate = rate;
                         new_hr.timestamp = time(NULL);
 
-                        LOG_INFO("New HR reading --> rate: %0.1f, time: %lli", new_hr.rate, new_hr.timestamp);
+                        LOG_INFO("New HR reading --> rate: %0.1f, time: %lli", rate_raw, new_hr.timestamp);
 
                         while (_HR.size() >= HR_BUFFER_SIZE)
                         {

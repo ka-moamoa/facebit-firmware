@@ -31,12 +31,15 @@
 #include "BCG.h"
 
 DigitalOut led(LED1);
+BusControl *bus_control = BusControl::get_instance();
 
 SWO_Channel SWO; // for SWO logging
+I2C i2c(I2C_SDA0, I2C_SCL0);
 SPI spi(SPI_MOSI, SPI_MISO, SPI_SCK);
 
 Si7051 temp(&i2c);
 Barometer barometer(&spi, BAR_CS, BAR_DRDY);
+BCG bcg(&spi, IMU_INT1, IMU_CS);
 
 SWO_Channel swo("channel");
 
@@ -46,9 +49,9 @@ const static char DEVICE_NAME[] = "SMARTPPE";
 
 static events::EventQueue event_queue(16 * EVENTS_EVENT_SIZE);
 
-
 Thread *thread1;
-Thread *thread2;
+// Thread *thread2;
+Thread *thread3;
 
 SmartPPEService smart_ppe_ble;
 
@@ -63,7 +66,6 @@ void led_thread()
         ThisThread::sleep_for(100ms);
     }
 }
-static events::EventQueue event_queue(/* event count */ 16 * EVENTS_EVENT_SIZE);
 
 void sensor_thread()
 {   
@@ -128,24 +130,45 @@ void sensor_thread()
     }
 }
 
+void bcg_thread()
+{
+    while(1)
+    {
+        LOG_INFO("%s", "taking bcg reading...");
+        if (bcg.bcg(20s))
+        {
+            while(bcg.get_buffer_size() > 0)
+            {
+                while(smart_ppe_ble.getDataReady() != smart_ppe_ble.NO_DATA)
+                {
+                    ThisThread::sleep_for(10ms);
+                }
+
+                BCG::HR_t hr = bcg.get_buffer_element();
+                smart_ppe_ble.updateHeartRate((uint64_t)hr.timestamp, hr.rate);
+                smart_ppe_ble.updateDataReady(smart_ppe_ble.HEART_RATE);
+            }
+        }
+        ThisThread::sleep_for(1s);        
+    }
+}
+
 int main()
 {
     swo.claim();
     
-    t1.start(led_thread);
-    
-    BCG bcg(&spi, IMU_INT1, IMU_CS);
-
     bus_control->init();
     ThisThread::sleep_for(10ms);
 
     thread1 = new Thread(osPriorityNormal, 512);
-    thread2 = new Thread();
+    // thread2 = new Thread();
+    thread3 = new Thread();
 
     BLE &ble = BLE::Instance();
 
     thread1->start(led_thread);
-    thread2->start(sensor_thread);
+    // thread2->start(sensor_thread);
+    thread3->start(bcg_thread);
 
     GattServerProcess ble_process(event_queue, ble);
     ble_process.on_init(callback(&smart_ppe_ble, &SmartPPEService::start));

@@ -31,9 +31,9 @@ public:
     {
         const UUID pressure_uuid(PRESSURE_UUID);
         const UUID temp_uuid(TEMPERATURE_UUID);
-        const UUID rr_uuid(MAGNETOMETER_UUID);
-        const UUID bcg_uuid(IMU_UUID);
-        const UUID fit_uuid(MICROPHONE_UUID);
+        const UUID rr_uuid(RESPIRATORY_RATE_UUID);
+        const UUID bcg_uuid(BCG_UUID);
+        const UUID fit_uuid(FIT_UUID);
         const UUID data_ready_uuid(DATA_READY_UUID);
 
         _pressure = new ReadOnlyArrayGattCharacteristic<uint8_t, 213> (pressure_uuid, &_initial_value_uint8_t);
@@ -61,7 +61,7 @@ public:
             printf("Allocation of mic characteristic failed\r\n");
         }
 
-        _data_ready = new ReadWriteGattCharacteristic<uint8_t> (data_ready_uuid, &_initial_value_uint8_t);
+        _data_ready = new ReadOnlyGattCharacteristic<uint8_t> (data_ready_uuid, &_initial_value_data_ready, GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_NOTIFY);
         if (!_data_ready) {
             printf("Allocation of data quality characteristic failed\r\n");
         }
@@ -154,6 +154,18 @@ public:
         _server->write(_respiratory_rate->getValueHandle(), bytearray, 9);
     }
 
+    void updateHeartRate(uint64_t data_timestamp, uint8_t heart_rate)
+    {
+        uint8_t bytearray[9] = {0};
+        uint64_t timestamp = data_timestamp;
+        std::memcpy(bytearray, &timestamp, 8);
+
+        uint8_t rr = heart_rate;
+        std::memcpy(&bytearray[8], &rr, 1);
+
+        _server->write(_respiratory_rate->getValueHandle(), bytearray, 9);
+    }
+
     void updateDataReady(data_ready_t type)
     {
         uint8_t tmp = (uint8_t)type;
@@ -177,8 +189,9 @@ private:
     ReadOnlyArrayGattCharacteristic<uint8_t, 9>* _respiratory_rate = nullptr;
     ReadOnlyArrayGattCharacteristic<uint8_t, 9>* _bcg = nullptr;
     ReadOnlyArrayGattCharacteristic<uint8_t, 9>* _fit = nullptr;
-    ReadWriteGattCharacteristic<uint8_t>* _data_ready = nullptr;
+    ReadOnlyGattCharacteristic<uint8_t>* _data_ready = nullptr;
 
+    uint8_t _initial_value_data_ready = NO_DATA;
     uint8_t _initial_value_uint8_t = 0;
     uint16_t _initial_value_uint16_t = 0;
     uint32_t _initial_value_uint32_t = 0;

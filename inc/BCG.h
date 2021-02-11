@@ -11,17 +11,20 @@ using namespace std::chrono;
 class BCG
 {
 public:
+    typedef struct
+    {
+        uint8_t rate;
+        time_t timestamp;
+    } HR_t;
+
     BCG(SPI *spi, PinName int1_pin, PinName cs);
     ~BCG();
 
     bool bcg(const seconds num_seconds);
     float get_frequency() { return G_FREQUENCY; }
 
-    typedef struct
-    {
-        float rate;
-        time_t timestamp;
-    } HR_t;
+    uint8_t get_buffer_size() { return _HR.size(); };
+    HR_t get_buffer_element();
 
 private:
     BusControl *_bus_control;
