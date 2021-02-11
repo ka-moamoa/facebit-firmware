@@ -160,7 +160,7 @@ public:
         _server->write(_data_ready->getValueHandle(), &tmp, 1);
     }
 
-    data_ready_t getDataRead()
+    data_ready_t getDataReady()
     {
         uint16_t length = 1;
         uint8_t data_ready = -1;
