@@ -96,7 +96,7 @@ private:
 	
 	const uint8_t MEASUREMENT_TIMEOUT_MS = 20; 
 
-	const uint8_t MAX_BUFFER_SIZE = 100;
+	const uint8_t MAX_BUFFER_SIZE = 50;
 };
 
 #endif

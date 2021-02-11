@@ -82,7 +82,15 @@ void get_resp_rate()
         {
             temp.update();
             while(!temp.getBufferFull())temp.update();
-                
+            
+            smart_ppe_ble.updateTemperature(
+                temp.getDeltaTimestamp(true),
+                temp.getFrequencyx100(),
+                temp.getBuffer(),
+                temp.getBufferSize());
+
+            smart_ppe_ble.updateDataReady(smart_ppe_ble.TEMPERATURE);
+            
             //printf("In oop\r\n");
             uint16_t *buffer = temp.getBuffer();
             for (int j = 0; j < temp.getBufferSize(); j++)
@@ -92,15 +100,17 @@ void get_resp_rate()
                 sum = sum + samples[i];
                 i++;
             }
+            
+
             temp.clearBuffer();
             //printf("Data %d\r\n",sum);
         }
-        
+        ThisThread::sleep_for(50ms);
         // convert to floating points
         float mean = (sum / SAMPLE_SIZE);
         printf("Mean %f\r\n",mean);
         int i = 1;
-        int max_count = 0;
+        uint8_t max_count = 0;
         float local_max = 0; 
         float max_average = 0; 
         float delta = 0.5;
@@ -137,6 +147,8 @@ void get_resp_rate()
             i=i+1;
         }
         printf("Breath Count %d\r\n",max_count);
+        smart_ppe_ble.updateRespiratoryRate(temp.getDeltaTimestamp(true),max_count);
+        smart_ppe_ble.updateDataReady(smart_ppe_ble.RESPIRATORY_RATE);
         fflush(stdout);
         ThisThread::sleep_for(1ms);
     }
@@ -203,7 +215,6 @@ void sensor_thread()
 
             temp.clearBuffer();
         }
-
         ThisThread::sleep_for(1ms);
     }
 }
