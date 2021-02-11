@@ -61,7 +61,7 @@ public:
             printf("Allocation of mic characteristic failed\r\n");
         }
 
-        _data_ready = new ReadOnlyGattCharacteristic<uint8_t> (data_ready_uuid, &_initial_value_uint8_t);
+        _data_ready = new ReadWriteGattCharacteristic<uint8_t> (data_ready_uuid, &_initial_value_uint8_t);
         if (!_data_ready) {
             printf("Allocation of data quality characteristic failed\r\n");
         }
@@ -177,7 +177,7 @@ private:
     ReadOnlyArrayGattCharacteristic<uint8_t, 9>* _respiratory_rate = nullptr;
     ReadOnlyArrayGattCharacteristic<uint8_t, 9>* _bcg = nullptr;
     ReadOnlyArrayGattCharacteristic<uint8_t, 9>* _fit = nullptr;
-    ReadOnlyGattCharacteristic<uint8_t>* _data_ready = nullptr;
+    ReadWriteGattCharacteristic<uint8_t>* _data_ready = nullptr;
 
     uint8_t _initial_value_uint8_t = 0;
     uint16_t _initial_value_uint16_t = 0;
