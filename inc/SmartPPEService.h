@@ -31,39 +31,39 @@ public:
     {
         const UUID pressure_uuid(PRESSURE_UUID);
         const UUID temp_uuid(TEMPERATURE_UUID);
+        const UUID rr_uuid(MAGNETOMETER_UUID);
+        const UUID bcg_uuid(IMU_UUID);
+        const UUID fit_uuid(MICROPHONE_UUID);
         const UUID data_ready_uuid(DATA_READY_UUID);
-        const UUID mag_uuid(MAGNETOMETER_UUID);
-        const UUID imu_uuid(IMU_UUID);
-        const UUID mic_uuid(MICROPHONE_UUID);
 
-        _pressure_characteristic = new ReadOnlyArrayGattCharacteristic<uint8_t, 213> (pressure_uuid, &_initial_value_uint8_t);
-        if (!_pressure_characteristic) {
+        _pressure = new ReadOnlyArrayGattCharacteristic<uint8_t, 213> (pressure_uuid, &_initial_value_uint8_t);
+        if (!_pressure) {
             printf("Allocation of pressure characteristic failed\r\n");
         }
 
-        _temperature_characteristic = new ReadOnlyArrayGattCharacteristic<uint8_t, 213> (temp_uuid, &_initial_value_uint8_t);
-        if (!_temperature_characteristic) {
+        _temperature = new ReadOnlyArrayGattCharacteristic<uint8_t, 213> (temp_uuid, &_initial_value_uint8_t);
+        if (!_temperature) {
             printf("Allocation of temperature characteristic failed\r\n");
         }
 
-        _data_ready_characteristic = new ReadOnlyGattCharacteristic<uint8_t> (data_ready_uuid, &_initial_value_uint8_t, GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_NOTIFY);
-        if (!_data_ready_characteristic) {
-            printf("Allocation of data quality characteristic failed\r\n");
-        }
-
-        _mag_characteristic = new ReadOnlyGattCharacteristic<uint16_t> (mag_uuid, &_initial_value_uint16_t, GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_NOTIFY);
-        if (!_mag_characteristic) {
+        _respiratory_rate = new ReadOnlyArrayGattCharacteristic<uint8_t, 9> (rr_uuid, &_initial_value_uint8_t);
+        if (!_respiratory_rate) {
             printf("Allocation of magnetometer characteristic failed\r\n");
         }
 
-        _imu_characteristic = new ReadOnlyGattCharacteristic<uint16_t> (imu_uuid, &_initial_value_uint16_t, GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_NOTIFY);
-        if (!_imu_characteristic) {
+        _bcg = new ReadOnlyArrayGattCharacteristic<uint8_t, 9> (bcg_uuid, &_initial_value_uint8_t);
+        if (!_bcg) {
             printf("Allocation of imu characteristic failed\r\n");
         }
 
-        _mic_characteristic = new ReadOnlyGattCharacteristic<uint16_t> (mic_uuid, &_initial_value_uint16_t, GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_NOTIFY);
-        if (!_mic_characteristic) {
+        _fit = new ReadOnlyArrayGattCharacteristic<uint8_t, 9> (fit_uuid, &_initial_value_uint8_t);
+        if (!_fit) {
             printf("Allocation of mic characteristic failed\r\n");
+        }
+
+        _data_ready = new ReadOnlyGattCharacteristic<uint8_t> (data_ready_uuid, &_initial_value_uint8_t);
+        if (!_data_ready) {
+            printf("Allocation of data quality characteristic failed\r\n");
         }
     }
 
@@ -75,12 +75,12 @@ public:
     {
         const UUID uuid = "6243fabc-23e9-4b79-bd30-1dc57b8005d6";
         GattCharacteristic* charTable[] = { 
-            _pressure_characteristic,  
-            _temperature_characteristic,
-            _data_ready_characteristic,
-            _mag_characteristic,
-            _imu_characteristic,
-            _mic_characteristic };
+            _pressure,  
+            _temperature,
+            _respiratory_rate,
+            _bcg,
+            _fit,
+            _data_ready };
         GattService smart_ppe_service(uuid, charTable, 6);
 
         _server = &ble.gattServer();
@@ -114,7 +114,7 @@ public:
             bytearray[13 + i*2] = (uint8_t)((pressure_array[i] >> 8) & 0xFF);
             bytearray[13 + (i*2)+1] = (uint8_t)(pressure_array[i] & 0xFF);
         }
-        _server->write(_pressure_characteristic->getValueHandle(), bytearray, (size * 2) + 13);
+        _server->write(_pressure->getValueHandle(), bytearray, (size * 2) + 13);
     }
 
     void updateTemperature(uint64_t data_timestamp, uint32_t measurement_frequencyx100, uint16_t *temperature_array, uint8_t size)
@@ -139,24 +139,45 @@ public:
             bytearray[13 + i*2] = (uint8_t)((temperature_array[i] >> 8) & 0xFF);
             bytearray[13 + (i*2)+1] = (uint8_t)(temperature_array[i] & 0xFF);
         }
-        _server->write(_temperature_characteristic->getValueHandle(), bytearray, (size * 2) + 13);
+        _server->write(_temperature->getValueHandle(), bytearray, (size * 2) + 13);
+    }
+
+    void updateRespiratoryRate(uint64_t data_timestamp, uint8_t respiratory_rate)
+    {
+        uint8_t bytearray[9] = {0};
+        uint64_t timestamp = data_timestamp;
+        std::memcpy(bytearray, &timestamp, 8);
+
+        uint8_t rr = respiratory_rate;
+        std::memcpy(&bytearray[8], &rr, 1);
+
+        _server->write(_respiratory_rate->getValueHandle(), bytearray, 9);
     }
 
     void updateDataReady(data_ready_t type)
     {
         uint8_t tmp = (uint8_t)type;
-        _server->write(_data_ready_characteristic->getValueHandle(), &tmp, 1);
+        _server->write(_data_ready->getValueHandle(), &tmp, 1);
+    }
+
+    data_ready_t getDataRead()
+    {
+        uint16_t length = 1;
+        uint8_t data_ready = -1;
+        _server->read(_data_ready->getValueHandle(), &data_ready, &length);
+
+        return static_cast<data_ready_t>( data_ready );
     }
 
 private:
     GattServer* _server = nullptr;
 
-    ReadOnlyArrayGattCharacteristic<uint8_t, 213>* _pressure_characteristic = nullptr;
-    ReadOnlyArrayGattCharacteristic<uint8_t, 213>* _temperature_characteristic = nullptr;
-    ReadOnlyGattCharacteristic<uint8_t>* _data_ready_characteristic = nullptr;
-    ReadOnlyGattCharacteristic<uint16_t>* _imu_characteristic = nullptr;
-    ReadOnlyGattCharacteristic<uint16_t>* _mag_characteristic = nullptr;
-    ReadOnlyGattCharacteristic<uint16_t>* _mic_characteristic = nullptr;
+    ReadOnlyArrayGattCharacteristic<uint8_t, 213>* _pressure = nullptr;
+    ReadOnlyArrayGattCharacteristic<uint8_t, 213>* _temperature = nullptr;
+    ReadOnlyArrayGattCharacteristic<uint8_t, 9>* _respiratory_rate = nullptr;
+    ReadOnlyArrayGattCharacteristic<uint8_t, 9>* _bcg = nullptr;
+    ReadOnlyArrayGattCharacteristic<uint8_t, 9>* _fit = nullptr;
+    ReadOnlyGattCharacteristic<uint8_t>* _data_ready = nullptr;
 
     uint8_t _initial_value_uint8_t = 0;
     uint16_t _initial_value_uint16_t = 0;
