@@ -23,7 +23,7 @@
 #include "I2C.h"
 #include "SWO.h"
 #include "SWOLogger.h"
-
+#include "CapCalc.h"
 #include "BusControl.h"
 #include "Barometer.hpp"
 #include "Si7051.h"
@@ -46,22 +46,90 @@ using namespace std::literals::chrono_literals;
 
 const static char DEVICE_NAME[] = "SMARTPPE";
 
-static events::EventQueue event_queue(16 * EVENTS_EVENT_SIZE);
+static events::EventQueue task_queue(16 * EVENTS_EVENT_SIZE);
 
-Thread *thread1;
-Thread *thread2;
+// Frequency configuration of each task
+ const std::chrono::milliseconds LED_TASK= 1000ms;
+ const std::chrono::milliseconds RESP_TASK= 120000ms;//10mins 
+
+static events::EventQueue event_queue(/* event count */ 16 * EVENTS_EVENT_SIZE);
+LowPowerTicker lpt_led,lpt_resp_rate;
+
+
+float cap_voltage = 0;
+
+CapCalc cap(VCAP, VCAP_ENABLE, 3000);
+float available_energy = 0;
+
+const float MIN_VOLTAGE = 2.3;
+
+const int LED_ENERGY = 0.001;
+const int SENSING_ENERGY = 0.001;
+
+const bool RUN_LED = false;
+const bool RUN_SENSING = false;
+
+
+Thread *thread1, *thread2, *thread3;
 
 SmartPPEService smart_ppe_ble;
 
 void led_thread()
 {
-    while (1)
+    //while (1)
     {
         led = 0;
         ThisThread::sleep_for(2000ms);
         led = 1;
         ThisThread::sleep_for(10ms);
     }
+}
+
+void check_voltage()
+{
+    available_energy = cap.calc_joules();
+    cap_voltage = cap.read_capacitor_voltage();
+    printf("\r\nVoltage: %0.2f\r\n",cap_voltage);
+    printf("Energy: %0.2f\r\n",available_energy);
+}
+int calc_resp_rate(float samples[], int SAMPLE_SIZE, float mean)
+{
+    int i = 1;
+    uint8_t max_count = 0;
+    float local_max = 0;
+    float max_average = 0;
+    float delta = 0.5;
+    // printf("Breath Count %d\r\n",max_count);
+    while (i < SAMPLE_SIZE)
+    {
+        if (samples[i] - mean > 0)
+        {
+            if (local_max < samples[i])
+            {
+                local_max = samples[i];
+            }
+        }
+        else if (samples[i] - mean <= 0)
+        {
+            if (local_max != 0)
+            {
+                if (max_average != 0 && abs(local_max - max_average) < delta)
+                {
+                    max_count = max_count + 1;
+                    max_average = (max_average + local_max) / 2;
+                    local_max = 0;
+                }
+                else if (max_average == 0)
+                {
+                    max_count = max_count + 1;
+                    max_average = local_max;
+                    local_max = 0;
+                }
+            }
+        }
+        i = i + 1;
+    }
+    return max_count;
 }
 void get_resp_rate()
 {
@@ -71,88 +139,59 @@ void get_resp_rate()
     bus_control->i2c_power(true);
 
     ThisThread::sleep_for(1000ms);
-
+    int resp_count = 0;
     temp.initialize();
     while (1)
     {
-        const int SAMPLE_SIZE = 300;
-        float samples[SAMPLE_SIZE] = {};
-        float sum = 0;
-        for (int i = 0; i < SAMPLE_SIZE;)
+        printf("Resp # %d", resp_count);
+        int total_windows = 2;
+        int breath_count = 0;
+        for (int window = 0; window < total_windows; window++)
         {
-            temp.update();
-            while(!temp.getBufferFull())temp.update();
-            
-            smart_ppe_ble.updateTemperature(
-                temp.getDeltaTimestamp(true),
-                temp.getFrequencyx100(),
-                temp.getBuffer(),
-                temp.getBufferSize());
+            const int SAMPLE_SIZE = 300;
+            float samples[SAMPLE_SIZE] = {};
+            float sum = 0;
+         
+            for (int i = 0; i < SAMPLE_SIZE;)
+            {
+                temp.update();
+                while (!temp.getBufferFull())
+                    temp.update();
 
-            smart_ppe_ble.updateDataReady(smart_ppe_ble.TEMPERATURE);
-            
-            //printf("In oop\r\n");
-            uint16_t *buffer = temp.getBuffer();
-            for (int j = 0; j < temp.getBufferSize(); j++)
-            {
-                //printf("Data %d\r\n",buffer[j]);
-                samples[i] = (buffer[j]/100.0);
-                sum = sum + samples[i];
-                i++;
-            }
-            
+                smart_ppe_ble.updateTemperature(
+                    temp.getDeltaTimestamp(true),
+                    temp.getFrequencyx100(),
+                    temp.getBuffer(),
+                    temp.getBufferSize());
 
-            temp.clearBuffer();
-            //printf("Data %d\r\n",sum);
-        }
-        ThisThread::sleep_for(50ms);
-        // convert to floating points
-        float mean = (sum / SAMPLE_SIZE);
-        printf("Mean %f\r\n",mean);
-        int i = 1;
-        uint8_t max_count = 0;
-        float local_max = 0; 
-        float max_average = 0; 
-        float delta = 0.5;
-       // printf("Breath Count %d\r\n",max_count);
-        while (i < SAMPLE_SIZE)
-        {
-            if (samples[i] - mean > 0)
-            {
-                if (local_max < samples[i])
+                smart_ppe_ble.updateDataReady(smart_ppe_ble.TEMPERATURE);
+
+                uint16_t *buffer = temp.getBuffer();
+                for (int j = 0; j < temp.getBufferSize(); j++)
                 {
-                    local_max = samples[i];
+                    printf("Data %d\r\n", buffer[j]);
+                    samples[i] = (buffer[j] / 100.0);
+                    sum = sum + samples[i];
+                    i++;
                 }
+                temp.clearBuffer();
+                //printf("Data %d\r\n",sum);
             }
-            else if (samples[i] - mean <= 0)
-            {
-                if (local_max != 0)
-                {
-                    if (max_average != 0 && abs(local_max - max_average) < delta)
-                    {
-                        //printf("B %d\r\n",max_average);
-                        max_count = max_count + 1;
-                        max_average = (max_average + local_max) / 2;
-                        local_max = 0;
-                    }
-                    else if (max_average == 0)
-                    {
-                        //printf("B %d\r\n",max_average);
-                        max_count = max_count + 1;
-                        max_average = local_max;
-                        local_max = 0;
-                    }
-                }
-            }
-            i=i+1;
+            ThisThread::sleep_for(50ms);
+            // convert to floating points
+
+            float mean = (sum) / SAMPLE_SIZE;
+            printf("Mean %f\r\n", mean);
+            breath_count += calc_resp_rate(samples, SAMPLE_SIZE, mean);
         }
-        printf("Breath Count %d\r\n",max_count);
-        smart_ppe_ble.updateRespiratoryRate(temp.getDeltaTimestamp(true),max_count);
+
+        printf("Breath Count %d\r\n", breath_count);
+        smart_ppe_ble.updateRespiratoryRate(temp.getDeltaTimestamp(true), breath_count);
         smart_ppe_ble.updateDataReady(smart_ppe_ble.RESPIRATORY_RATE);
         fflush(stdout);
         ThisThread::sleep_for(1ms);
+        resp_count = resp_count + 1;
     }
-
 }
 void sensor_thread()
 {
@@ -228,12 +267,13 @@ int main()
 
     thread1 = new Thread(osPriorityNormal, 512);
     thread2 = new Thread();
+    thread3 = new Thread();
 
     BLE &ble = BLE::Instance();
 
     thread1->start(led_thread);
     thread2->start(get_resp_rate);
-
+    thread3->start(callback(&task_queue, &EventQueue::dispatch_forever));
     GattServerProcess ble_process(event_queue, ble);
     ble_process.on_init(callback(&smart_ppe_ble, &SmartPPEService::start));
 
