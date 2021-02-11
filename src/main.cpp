@@ -95,7 +95,7 @@ void get_resp_rate()
             uint16_t *buffer = temp.getBuffer();
             for (int j = 0; j < temp.getBufferSize(); j++)
             {
-                printf("Data %d\r\n",buffer[j]);
+                //printf("Data %d\r\n",buffer[j]);
                 samples[i] = (buffer[j]/100.0);
                 sum = sum + samples[i];
                 i++;
