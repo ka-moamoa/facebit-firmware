@@ -48,7 +48,6 @@ const static char DEVICE_NAME[] = "SMARTPPE";
 
 static events::EventQueue event_queue(16 * EVENTS_EVENT_SIZE);
 
-
 Thread *thread1;
 Thread *thread2;
 
@@ -56,7 +55,7 @@ SmartPPEService smart_ppe_ble;
 
 void led_thread()
 {
-    while(1)
+    while (1)
     {
         led = 0;
         ThisThread::sleep_for(2000ms);
@@ -64,9 +63,8 @@ void led_thread()
         ThisThread::sleep_for(10ms);
     }
 }
-
-void sensor_thread()
-{   
+void get_resp_rate()
+{
     bus_control->spi_power(true);
     spi.frequency(5000000);
 
@@ -75,20 +73,103 @@ void sensor_thread()
     ThisThread::sleep_for(1000ms);
 
     temp.initialize();
-    
+    while (1)
+    {
+        const int SAMPLE_SIZE = 300;
+        float samples[SAMPLE_SIZE] = {};
+        float sum = 0;
+        for (int i = 0; i < SAMPLE_SIZE;)
+        {
+            temp.update();
+            while(!temp.getBufferFull())temp.update();
+                
+            //printf("In oop\r\n");
+            uint16_t *buffer = temp.getBuffer();
+            for (int j = 0; j < temp.getBufferSize(); j++)
+            {
+                printf("Data %d\r\n",buffer[j]);
+                samples[i] = (buffer[j]/100.0);
+                sum = sum + samples[i];
+                i++;
+            }
+            temp.clearBuffer();
+            //printf("Data %d\r\n",sum);
+        }
+        
+        // convert to floating points
+        float mean = (sum / SAMPLE_SIZE);
+        printf("Mean %f\r\n",mean);
+        int i = 1;
+        int max_count = 0;
+        float local_max = 0; 
+        float max_average = 0; 
+        float delta = 0.5;
+       // printf("Breath Count %d\r\n",max_count);
+        while (i < SAMPLE_SIZE)
+        {
+            if (samples[i] - mean > 0)
+            {
+                if (local_max < samples[i])
+                {
+                    local_max = samples[i];
+                }
+            }
+            else if (samples[i] - mean <= 0)
+            {
+                if (local_max != 0)
+                {
+                    if (max_average != 0 && abs(local_max - max_average) < delta)
+                    {
+                        //printf("B %d\r\n",max_average);
+                        max_count = max_count + 1;
+                        max_average = (max_average + local_max) / 2;
+                        local_max = 0;
+                    }
+                    else if (max_average == 0)
+                    {
+                        //printf("B %d\r\n",max_average);
+                        max_count = max_count + 1;
+                        max_average = local_max;
+                        local_max = 0;
+                    }
+                }
+            }
+            i=i+1;
+        }
+        printf("Breath Count %d\r\n",max_count);
+        fflush(stdout);
+        ThisThread::sleep_for(1ms);
+    }
+
+}
+void sensor_thread()
+{
+    bus_control->spi_power(true);
+    spi.frequency(5000000);
+
+    bus_control->i2c_power(true);
+
+    ThisThread::sleep_for(1000ms);
+
+    temp.initialize();
+
     if (!barometer.initialize() || !barometer.set_fifo_full_interrupt(true))
     {
         LOG_WARNING("%s", "barometer failed to initialize");
-        while(1) {};
+        while (1)
+        {
+        };
     }
 
     if (!barometer.set_pressure_threshold(1100) || !barometer.enable_pressure_threshold(true, true, false))
     {
         LOG_WARNING("%s", "barometer setup failed");
-        while(1) {};
+        while (1)
+        {
+        };
     }
 
-    while(1)
+    while (1)
     {
         barometer.update();
         temp.update();
@@ -96,15 +177,14 @@ void sensor_thread()
         if (barometer.get_buffer_full())
         {
             LOG_DEBUG("barometer buffer full. %u elements. timestamp = %llu. measurement frequency x100 = %lu", barometer.get_pressure_buffer_size(), barometer.get_delta_timestamp(false), barometer.get_measurement_frequencyx100());
-            
-            smart_ppe_ble.updatePressure(
-                barometer.get_delta_timestamp(true), 
-                barometer.get_measurement_frequencyx100(), 
-                barometer.get_pressure_array(), 
-                barometer.get_pressure_buffer_size());
-            
-            smart_ppe_ble.updateDataReady(smart_ppe_ble.PRESSURE);
 
+            smart_ppe_ble.updatePressure(
+                barometer.get_delta_timestamp(true),
+                barometer.get_measurement_frequencyx100(),
+                barometer.get_pressure_array(),
+                barometer.get_pressure_buffer_size());
+
+            smart_ppe_ble.updateDataReady(smart_ppe_ble.PRESSURE);
 
             barometer.clear_buffers();
         }
@@ -114,7 +194,7 @@ void sensor_thread()
             LOG_DEBUG("temperature buffer full. %u elements. timestamp = %llu. measurement frequency x100 = %lu", temp.getBufferSize(), temp.getDeltaTimestamp(false), temp.getFrequencyx100());
 
             smart_ppe_ble.updateTemperature(
-                temp.getDeltaTimestamp(true), 
+                temp.getDeltaTimestamp(true),
                 temp.getFrequencyx100(),
                 temp.getBuffer(),
                 temp.getBufferSize());
@@ -141,7 +221,7 @@ int main()
     BLE &ble = BLE::Instance();
 
     thread1->start(led_thread);
-    thread2->start(sensor_thread);
+    thread2->start(get_resp_rate);
 
     GattServerProcess ble_process(event_queue, ble);
     ble_process.on_init(callback(&smart_ppe_ble, &SmartPPEService::start));
@@ -150,4 +230,3 @@ int main()
 
     return 0;
 }
-
