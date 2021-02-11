@@ -100,26 +100,6 @@ float BCG::bcg(const uint16_t num_samples)
 
             acquired_samples++;
 
-            // move each new sample through a moving average filter
-
-            // /**
-            //  * if it's the first sample, feed in data to prime the filter
-            //  * and avoid an obvious step response. Step response
-            //  * calculated by MATLAB.
-            //  * 
-            //  * We don't do anything with the values returned
-            //  * from the function.
-            //  */
-            // if (acquired_samples == 1) 
-            // {
-            //     for (int i = 0; i < G_FREQUENCY * BCG_STEP_DUR; i++)
-            //     {
-            //         bcg_isolation_x.step(x);
-            //         bcg_isolation_y.step(y);
-            //         bcg_isolation_z.step(z);
-            //     }
-            // }
-
             // put each axis through bcg features isolation filter
             x = bcg_isolation_x.step(x);
             y = bcg_isolation_y.step(y);
@@ -132,19 +112,6 @@ float BCG::bcg(const uint16_t num_samples)
 
             // printf("%f, ", mag);
 
-            // /**
-            //  * Similar to the bcg_isolation filter, we want
-            //  * to prime the hr_isolation filter with this first
-            //  * value for about the length of its step response.
-            //  */
-            // if (acquired_samples == 1) 
-            // {
-            //     for (int i = 0; i < G_FREQUENCY * HR_STEP_DUR; i++)
-            //     {
-            //         hr_isolation.step(mag);
-            //     }
-            // }
-
             // send l2norm through hr isolation filter
             float next_bcg_val = hr_isolation.step(mag);
             printf("%f, %f\r\n", zc_timer.read(), next_bcg_val);
@@ -156,16 +123,6 @@ float BCG::bcg(const uint16_t num_samples)
                 descending_zc_timestamps.push_back(zc_ts);
 
                 // printf("1\r\n");
-                
-                // if (num_zc >= INSTANT_AVERAGE)
-                // {
-                //     float result = 0.0;
-                //     for (int i = num_zc; i > num_zc - INSTANT_AVERAGE; i--)
-                //     {
-                //          result += (1.0 / (descending_zc_timestamps.at(i) - descending_zc_timestamps.at(i-1))) * 60.0 * 1.0 / INSTANT_AVERAGE;
-                //     }
-                //     LOG_INFO("HR = %f", result);
-                // }
     
                 num_zc++;
             }
@@ -323,3 +280,45 @@ double BCG::_l2norm(double x, double y, double z)
 //         l2norm.push_back(result);
 //     }
 // }
+
+            // /**
+            //  * if it's the first sample, feed in data to prime the filter
+            //  * and avoid an obvious step response. Step response
+            //  * calculated by MATLAB.
+            //  * 
+            //  * We don't do anything with the values returned
+            //  * from the function.
+            //  */
+            // if (acquired_samples == 1) 
+            // {
+            //     for (int i = 0; i < G_FREQUENCY * BCG_STEP_DUR; i++)
+            //     {
+            //         bcg_isolation_x.step(x);
+            //         bcg_isolation_y.step(y);
+            //         bcg_isolation_z.step(z);
+            //     }
+            // }
+
+                        // /**
+            //  * Similar to the bcg_isolation filter, we want
+            //  * to prime the hr_isolation filter with this first
+            //  * value for about the length of its step response.
+            //  */
+            // if (acquired_samples == 1) 
+            // {
+            //     for (int i = 0; i < G_FREQUENCY * HR_STEP_DUR; i++)
+            //     {
+            //         hr_isolation.step(mag);
+            //     }
+            // }
+
+
+                            // if (num_zc >= INSTANT_AVERAGE)
+                // {
+                //     float result = 0.0;
+                //     for (int i = num_zc; i > num_zc - INSTANT_AVERAGE; i--)
+                //     {
+                //          result += (1.0 / (descending_zc_timestamps.at(i) - descending_zc_timestamps.at(i-1))) * 60.0 * 1.0 / INSTANT_AVERAGE;
+                //     }
+                //     LOG_INFO("HR = %f", result);
+                // }

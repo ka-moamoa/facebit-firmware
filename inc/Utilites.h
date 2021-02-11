@@ -2,6 +2,7 @@
 #define UTILITIES_H_
 
 #include <math.h>
+#include <numeric>
 
 namespace Utilities
 {
@@ -15,6 +16,20 @@ namespace Utilities
     inline double round(double val)
     {
         return floor(val + 0.5);
+    }
+
+    inline double std_dev(vector<double> v)
+    {    
+        double sum = std::accumulate(v.begin(), v.end(), 0.0);
+        double mean = sum / v.size();
+
+        std::vector<double> diff(v.size());
+        std::transform(v.begin(), v.end(), diff.begin(),
+                    std::bind2nd(std::minus<double>(), mean));
+        double sq_sum = std::inner_product(diff.begin(), diff.end(), diff.begin(), 0.0);
+        double stdev = std::sqrt(sq_sum / v.size());
+
+        return stdev;
     }
 
 }

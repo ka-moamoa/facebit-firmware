@@ -63,13 +63,17 @@ int main()
     t1.start(led_thread);
     
     // LOG_INFO("%s", "starting collection in 5 seconds...");
-    ThisThread::sleep_for(5s);
     
     BCG bcg(&spi, IMU_INT1, IMU_CS);
 
     uint16_t num_samples = 20 * bcg.get_frequency(); // 10 seconds of data
-
-
+    Timer timer;
+    timer.start();
+    while(timer.read() < 10.0)
+    {
+        printf("%0.1f\r\n", timer.read());
+        ThisThread::sleep_for(100ms);
+    }
 
     while(1)
     {
