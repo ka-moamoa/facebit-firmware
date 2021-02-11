@@ -51,7 +51,6 @@ static events::EventQueue event_queue(/* event count */ 16 * EVENTS_EVENT_SIZE);
 //     bcg.collect_data(256);
 //     bcg.calc_hr();
 // }
-
 // void t1()
 // {
 //     event_queue.call(&bcg, &BCG::calc_hr);
@@ -63,17 +62,19 @@ int main()
     
     t1.start(led_thread);
     
-    LOG_INFO("%s", "starting collection in 5 seconds...");
+    // LOG_INFO("%s", "starting collection in 5 seconds...");
     ThisThread::sleep_for(5s);
     
     BCG bcg(&spi, IMU_INT1, IMU_CS);
 
-    uint16_t num_samples = 10 * bcg.get_frequency(); // 10 seconds of data
+    uint16_t num_samples = 20 * bcg.get_frequency(); // 10 seconds of data
+
+
 
     while(1)
     {
         bcg.bcg(num_samples);
-        printf("\r\n\n\n\n\n");
+        // printf("\r\n\n\n\n\n");
         ThisThread::sleep_for(5s);
     }
 

@@ -25,29 +25,39 @@ float BCG::bcg(const uint16_t num_samples)
     /**
      * @brief Init 4th order bandpass (10-13 Hz) Butterworth filters
      * 
-     * We need 3 of them since we're doing this real-time.
+     * We need 3 of them (one per axis) since we're doing this real-time.
      * 
      * Documentation can be found in BiQuad.h. BiQuads were 
      * generated with MATLAB assuming 104 Hz sampling frequency.
      */
     BiQuadChain bcg_isolation_x;
-    BiQuadChain bcg_isolation_y;
-    BiQuadChain bcg_isolation_z;
-    BiQuad bq1( 3.48624e-05, -6.97248e-05, 3.48624e-05, -1.42500e+00, 8.55705e-01 );
-    BiQuad bq2( 1.00000e+00, 2.00013e+00, 1.00013e+00, -1.50474e+00, 8.66039e-01 );
-    BiQuad bq3( 1.00000e+00, 1.99987e+00, 9.99873e-01, -1.42640e+00, 9.34678e-01 );
-    BiQuad bq4( 1.00000e+00, -2.00000e+00, 1.00000e+00, -1.61444e+00, 9.45725e-01 );
+    BiQuad bqx1( 3.48624e-05, -6.97248e-05, 3.48624e-05, -1.42500e+00, 8.55705e-01 );
+    BiQuad bqx2( 1.00000e+00, 2.00013e+00, 1.00013e+00, -1.50474e+00, 8.66039e-01 );
+    BiQuad bqx3( 1.00000e+00, 1.99987e+00, 9.99873e-01, -1.42640e+00, 9.34678e-01 );
+    BiQuad bqx4( 1.00000e+00, -2.00000e+00, 1.00000e+00, -1.61444e+00, 9.45725e-01 );
 
-    bcg_isolation_x = bq1 * bq2 * bq3 * bq4;
-    bcg_isolation_y = bq1 * bq2 * bq3 * bq4;
-    bcg_isolation_z = bq1 * bq2 * bq3 * bq4;
+    BiQuadChain bcg_isolation_y;
+    BiQuad bqy1( 3.48624e-05, -6.97248e-05, 3.48624e-05, -1.42500e+00, 8.55705e-01 );
+    BiQuad bqy2( 1.00000e+00, 2.00013e+00, 1.00013e+00, -1.50474e+00, 8.66039e-01 );
+    BiQuad bqy3( 1.00000e+00, 1.99987e+00, 9.99873e-01, -1.42640e+00, 9.34678e-01 );
+    BiQuad bqy4( 1.00000e+00, -2.00000e+00, 1.00000e+00, -1.61444e+00, 9.45725e-01 );
+
+    BiQuadChain bcg_isolation_z;
+    BiQuad bqz1( 3.48624e-05, -6.97248e-05, 3.48624e-05, -1.42500e+00, 8.55705e-01 );
+    BiQuad bqz2( 1.00000e+00, 2.00013e+00, 1.00013e+00, -1.50474e+00, 8.66039e-01 );
+    BiQuad bqz3( 1.00000e+00, 1.99987e+00, 9.99873e-01, -1.42640e+00, 9.34678e-01 );
+    BiQuad bqz4( 1.00000e+00, -2.00000e+00, 1.00000e+00, -1.61444e+00, 9.45725e-01 );
+
+    bcg_isolation_x.add( &bqx1 ).add( &bqx2 ).add( &bqx3 ).add( &bqx4 );
+    bcg_isolation_y.add( &bqy1 ).add( &bqy2 ).add( &bqy3 ).add( &bqy4 );
+    bcg_isolation_z.add( &bqz1 ).add( &bqz2 ).add( &bqz3 ).add( &bqz4 );
 
     // Init 2nd order bandpass (0.75-2.5 Hz) Butterworth filter
     BiQuadChain hr_isolation;
     BiQuad bq5( 2.58488e-03, -5.16976e-03, 2.58488e-03, -1.88131e+00, 8.98067e-01 );
     BiQuad bq6( 1.00000e+00, 2.00000e+00, 1.00000e+00, -1.95665e+00, 9.59238e-01 );
 
-    hr_isolation = bq5 * bq6;
+    hr_isolation.add( &bq5 ).add( &bq6 );
 
     // Give time for the chip to turn on
     ThisThread::sleep_for(10ms);
@@ -71,8 +81,11 @@ float BCG::bcg(const uint16_t num_samples)
     LowPowerTimer zc_timer;
     zc_timer.start();
 
+    // printf("ts, x, y, z, x1, y1, y2, l2norm, bcg, zc\r\n");
+
     // acquire and process samples until we have as many as asked for
-    while(acquired_samples < num_samples)
+    // while(acquired_samples < num_samples)
+    while(1)
     {
         if (_g_drdy.read())        
         {
@@ -83,62 +96,82 @@ float BCG::bcg(const uint16_t num_samples)
             double y = gyr[1];
             double z = gyr[2];
 
+            // printf("%f, %f, %f, %f, ", zc_timer.read(), x, y, z);
+
             acquired_samples++;
 
-            /**
-             * if it's the first sample, feed in about
-             * 2 seconds worth of data to prime the filter
-             * and avoid an obvious step response. Two
-             * seconds was chosen based on the step response
-             * calculated by MATLAB.
-             * 
-             * We don't do anything with the values returned
-             * from the function.
-             */
-            if (acquired_samples == 1) 
-            {
-                for (int i = 0; i < G_FREQUENCY * BCG_STEP_DUR; i++)
-                {
-                    bcg_isolation_x.step(x);
-                    bcg_isolation_y.step(y);
-                    bcg_isolation_z.step(z);
-                }
-            }
+            // move each new sample through a moving average filter
+
+            // /**
+            //  * if it's the first sample, feed in data to prime the filter
+            //  * and avoid an obvious step response. Step response
+            //  * calculated by MATLAB.
+            //  * 
+            //  * We don't do anything with the values returned
+            //  * from the function.
+            //  */
+            // if (acquired_samples == 1) 
+            // {
+            //     for (int i = 0; i < G_FREQUENCY * BCG_STEP_DUR; i++)
+            //     {
+            //         bcg_isolation_x.step(x);
+            //         bcg_isolation_y.step(y);
+            //         bcg_isolation_z.step(z);
+            //     }
+            // }
 
             // put each axis through bcg features isolation filter
             x = bcg_isolation_x.step(x);
             y = bcg_isolation_y.step(y);
             z = bcg_isolation_z.step(z);
+            
+            // printf("%f, %f, %f, ", x, y, z);
 
             // l2norm the signal
             double mag = _l2norm(x, y, z);
 
-            /**
-             * Similar to the bcg_isolation filter, we want
-             * to prime the hr_isolation filter with this first
-             * value for about the length of its step response (~2.5s).
-             */
-            if (acquired_samples == 1) 
-            {
-                for (int i = 0; i < G_FREQUENCY * HR_STEP_DUR; i++)
-                {
-                    hr_isolation.step(mag);
-                }
-            }
+            // printf("%f, ", mag);
+
+            // /**
+            //  * Similar to the bcg_isolation filter, we want
+            //  * to prime the hr_isolation filter with this first
+            //  * value for about the length of its step response.
+            //  */
+            // if (acquired_samples == 1) 
+            // {
+            //     for (int i = 0; i < G_FREQUENCY * HR_STEP_DUR; i++)
+            //     {
+            //         hr_isolation.step(mag);
+            //     }
+            // }
 
             // send l2norm through hr isolation filter
             float next_bcg_val = hr_isolation.step(mag);
-            printf("%f\r\n", next_bcg_val);
+            printf("%f, %f\r\n", zc_timer.read(), next_bcg_val);
             
             // look for a descending zero-cross
             if (last_bcg_val > 0 && next_bcg_val <= 0)
             {
                 float zc_ts = zc_timer.read();
                 descending_zc_timestamps.push_back(zc_ts);
+
+                // printf("1\r\n");
                 
-                // LOG_INFO("%s", "BEAT!");
+                // if (num_zc >= INSTANT_AVERAGE)
+                // {
+                //     float result = 0.0;
+                //     for (int i = num_zc; i > num_zc - INSTANT_AVERAGE; i--)
+                //     {
+                //          result += (1.0 / (descending_zc_timestamps.at(i) - descending_zc_timestamps.at(i-1))) * 60.0 * 1.0 / INSTANT_AVERAGE;
+                //     }
+                //     LOG_INFO("HR = %f", result);
+                // }
     
                 num_zc++;
+            }
+            else
+            {
+                // printf("\r\n");
             }
 
             last_bcg_val = next_bcg_val;
@@ -164,7 +197,7 @@ float BCG::bcg(const uint16_t num_samples)
     // others checks here as we come up with them...
 
     // calculate inter-beat intervals -> instananeous HRs -> average them
-    float HR_sum;
+    float HR_sum = 0;
     for (int i = 1; i < descending_zc_timestamps.size(); i++) // start at index 2
     {
         float interval = descending_zc_timestamps.at(i) - descending_zc_timestamps.at(i-1);
@@ -173,7 +206,7 @@ float BCG::bcg(const uint16_t num_samples)
     }
 
     float HR = HR_sum / descending_zc_timestamps.size();
-    // LOG_INFO("HR = %0.1f", HR);
+    LOG_INFO("HR = %0.1f", HR);
 
     return HR;
 }

@@ -27,8 +27,10 @@ private:
     float G_FREQUENCY = 104.0; // Hz
     float G_FULL_SCALE = 124.0; // max sensitivity
 
-    float BCG_STEP_DUR = 2.0; // seconds
+    float BCG_STEP_DUR = 2.5; // seconds
     float HR_STEP_DUR = 2.5; // seconds
+
+    uint8_t INSTANT_AVERAGE = 5;
 
     double _l2norm(double x, double y, double z);
 };
