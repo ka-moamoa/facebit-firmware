@@ -34,7 +34,6 @@ SPI spi(SPI_MOSI, SPI_MISO, SPI_SCK);
 SWO_Channel swo("channel");
 
 using namespace std::literals::chrono_literals;
-// LowPowerTicker bcg_ticker;
 Thread t1;
 void led_thread()
 {
@@ -47,14 +46,7 @@ void led_thread()
     }
 }
 static events::EventQueue event_queue(/* event count */ 16 * EVENTS_EVENT_SIZE);
-// void bcg_callback(){
-//     bcg.collect_data(256);
-//     bcg.calc_hr();
-// }
-// void t1()
-// {
-//     event_queue.call(&bcg, &BCG::calc_hr);
-// }
+
     
 int main()
 {
@@ -62,23 +54,17 @@ int main()
     
     t1.start(led_thread);
     
-    // LOG_INFO("%s", "starting collection in 5 seconds...");
-    
     BCG bcg(&spi, IMU_INT1, IMU_CS);
 
     uint16_t num_samples = 20 * bcg.get_frequency(); // 10 seconds of data
     Timer timer;
     timer.start();
-    // while(timer.read() < 10.0)
-    // {
-    //     printf("%0.1f\r\n", timer.read());
-    //     ThisThread::sleep_for(100ms);
-    // }
+     
+    LOG_INFO("%s", "Starting data collection, be very still...")
 
     while(1)
     {
         bcg.bcg(100s);
-        // printf("\r\n\n\n\n\n");
         ThisThread::sleep_for(5s);
     }
 

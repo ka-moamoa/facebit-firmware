@@ -86,7 +86,6 @@ bool BCG::bcg(const seconds num_seconds)
     LowPowerTimer zc_timer;
     zc_timer.start();
 
-    // printf("ts, x, y, z, x1, y1, y2, l2norm, bcg, zc\r\n");
 
     // acquire and process samples until num_seconds has elapsed
     while(zc_timer.elapsed_time() <= duration_cast<microseconds>(num_seconds))
@@ -100,8 +99,6 @@ bool BCG::bcg(const seconds num_seconds)
             double y = gyr[1];
             double z = gyr[2];
 
-            // printf("%f, %f, %f, %f, ", zc_timer.read(), x, y, z);
-
             acquired_samples++;
 
             // put each axis through bcg features isolation filter
@@ -109,8 +106,6 @@ bool BCG::bcg(const seconds num_seconds)
             y = bcg_isolation_y.step(y);
             z = bcg_isolation_z.step(z);
             
-            // printf("%f, %f, %f, ", x, y, z);
-
             // l2norm the signal
             double mag = _l2norm(x, y, z);
 
@@ -118,7 +113,6 @@ bool BCG::bcg(const seconds num_seconds)
 
             // send l2norm through hr isolation filter
             float next_bcg_val = hr_isolation.step(mag);
-            // printf("%f, %f\r\n", zc_timer.read(), next_bcg_val);
             
             // look for a descending zero-cross
             if (last_bcg_val > 0 && next_bcg_val <= 0)
@@ -135,15 +129,13 @@ bool BCG::bcg(const seconds num_seconds)
                      * use them to calculate a heart rate and save to the vector.
                      */
                     vector<double> crosses_copy = last_crosses;
-                    // LOG_INFO("raw: %f", crosses_copy[0]);
+
                     std::adjacent_difference(crosses_copy.begin(), crosses_copy.end(), crosses_copy.begin());
                     crosses_copy.erase(crosses_copy.begin());
+
                     Utilities::reciprocal(crosses_copy); // get element-wise frequency
-                    // LOG_INFO("%f", crosses_copy[0]);
                     Utilities::multiply(crosses_copy, 60.0); // get element-wise heart rate
-                    // LOG_INFO("%f", crosses_copy[0]);
                     float std_dev = Utilities::std_dev(crosses_copy); // calculate standard deviation across the heart rates
-                    // LOG_INFO("%f", crosses_copy[0]);
                     
                     if (std_dev < STD_DEV_THRESHOLD) // we have some stable readings! calculate heart rate
                     {
@@ -169,16 +161,11 @@ bool BCG::bcg(const seconds num_seconds)
                         last_crosses.erase(last_crosses.begin());
                     }
                 }
-
-                // printf("1\r\n");    
-            }
-            else
-            {
-                // printf("\r\n");
             }
 
             last_bcg_val = next_bcg_val;
         }
+        
         ThisThread::sleep_for(1ms);
     }
 
