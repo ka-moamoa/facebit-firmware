@@ -131,23 +131,29 @@ void sensor_thread()
 }
 
 void bcg_thread()
-{
+{   
+    Timer ble_send_timeout;
     while(1)
     {
+        set_time(smart_ppe_ble.getTime());
         LOG_INFO("%s", "taking bcg reading...");
         if (bcg.bcg(20s))
         {
-            while(bcg.get_buffer_size() > 0)
+            ble_send_timeout.start();
+            while(bcg.get_buffer_size() > 0 && ble_send_timeout.read_ms() < 5000)
             {
-                while(smart_ppe_ble.getDataReady() != smart_ppe_ble.NO_DATA)
+                if (smart_ppe_ble.getDataReady() == smart_ppe_ble.NO_DATA)
                 {
-                    ThisThread::sleep_for(10ms);
+                    BCG::HR_t hr = bcg.get_buffer_element();
+                    LOG_INFO("Sending HR = %u", hr.rate);
+                    smart_ppe_ble.updateHeartRate((uint64_t)hr.timestamp, hr.rate);
                 }
-
-                BCG::HR_t hr = bcg.get_buffer_element();
-                smart_ppe_ble.updateHeartRate((uint64_t)hr.timestamp, hr.rate);
+                
                 smart_ppe_ble.updateDataReady(smart_ppe_ble.HEART_RATE);
+                ThisThread::sleep_for(20ms);
             }
+            ble_send_timeout.stop();
+            ble_send_timeout.reset();
         }
         ThisThread::sleep_for(1s);        
     }

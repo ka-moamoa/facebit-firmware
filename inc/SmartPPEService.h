@@ -13,6 +13,7 @@ class SmartPPEService : ble::GattServer::EventHandler {
     const char* RESPIRATORY_RATE_UUID = "0F1F34A3-4567-484C-ACA2-CC8F662E8784";
     const char* BCG_UUID = "0F1F34A3-4567-484C-ACA2-CC8F662E8785";
     const char* FIT_UUID = "0F1F34A3-4567-484C-ACA2-CC8F662E8786";
+    const char* TIME_UUID = "0F1F34A3-4567-484C-ACA2-CC8F662E8787";
 
 public:
     enum data_ready_t
@@ -35,6 +36,7 @@ public:
         const UUID bcg_uuid(BCG_UUID);
         const UUID fit_uuid(FIT_UUID);
         const UUID data_ready_uuid(DATA_READY_UUID);
+        const UUID time_uuid(TIME_UUID);
 
         _pressure = new ReadOnlyArrayGattCharacteristic<uint8_t, 213> (pressure_uuid, &_initial_value_uint8_t);
         if (!_pressure) {
@@ -64,6 +66,11 @@ public:
         _data_ready = new ReadWriteGattCharacteristic<uint8_t> (data_ready_uuid, &_initial_value_data_ready, GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_NOTIFY);
         if (!_data_ready) {
             printf("Allocation of data quality characteristic failed\r\n");
+        }
+
+        _time = new ReadWriteGattCharacteristic<uint64_t> (time_uuid, &_initial_value_uint64_t);
+        if (!_time) {
+            printf("Allocation of time characteristic failed\r\n");
         }
     }
 
@@ -160,8 +167,8 @@ public:
         uint64_t timestamp = data_timestamp;
         std::memcpy(bytearray, &timestamp, 8);
 
-        uint8_t rr = heart_rate;
-        std::memcpy(&bytearray[8], &rr, 1);
+        uint8_t hr = heart_rate;
+        std::memcpy(&bytearray[8], &hr, 1);
 
         _server->write(_bcg->getValueHandle(), bytearray, 9);
     }
@@ -181,6 +188,29 @@ public:
         return static_cast<data_ready_t>( data_ready );
     }
 
+    void updateTime(uint64_t epoch_time)
+    {
+        uint8_t bytearray[8] = {0};
+
+        uint64_t time = epoch_time;
+        std::memcpy(bytearray, &time, 8);
+
+        _server->write(_time->getValueHandle(), bytearray, 8);
+    }
+
+    uint64_t getTime()
+    {
+        uint16_t length = 8;
+        uint8_t epoch_time_array[8];
+
+        _server->read(_time->getValueHandle(), epoch_time_array, &length);
+
+        uint64_t epoch_time = 0;
+        std::memcpy(&epoch_time, epoch_time_array, 8);
+
+        return epoch_time;
+    }
+
 private:
     GattServer* _server = nullptr;
 
@@ -190,11 +220,13 @@ private:
     ReadOnlyArrayGattCharacteristic<uint8_t, 9>* _bcg = nullptr;
     ReadOnlyArrayGattCharacteristic<uint8_t, 9>* _fit = nullptr;
     ReadWriteGattCharacteristic<uint8_t>* _data_ready = nullptr;
+    ReadWriteGattCharacteristic<uint64_t>* _time = nullptr;
 
     uint8_t _initial_value_data_ready = NO_DATA;
     uint8_t _initial_value_uint8_t = 0;
     uint16_t _initial_value_uint16_t = 0;
     uint32_t _initial_value_uint32_t = 0;
+    uint64_t _initial_value_uint64_t = 0;
 };
 
 #endif // SMART_PPE_SERVICE_H_
