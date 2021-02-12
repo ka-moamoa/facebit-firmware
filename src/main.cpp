@@ -130,11 +130,19 @@ void sensor_thread()
     }
 }
 
-void bcg_thread()
+void bcg_thread(GattServerProcess *ble_process)
 {   
+    while(!ble_process->is_connected())
+    {
+        ThisThread::sleep_for(1s);
+    }
+
+    ThisThread::sleep_for(1s);
+
     Timer ble_send_timeout;
     while(1)
     {
+        smart_ppe_ble.updateTime(time(NULL));
         set_time(smart_ppe_ble.getTime());
         LOG_INFO("%s", "taking bcg reading...");
         if (bcg.bcg(20s))
@@ -162,6 +170,9 @@ void bcg_thread()
 int main()
 {
     swo.claim();
+
+    BLE &ble = BLE::Instance();
+    GattServerProcess ble_process(event_queue, ble);
     
     bus_control->init();
     ThisThread::sleep_for(10ms);
@@ -170,13 +181,10 @@ int main()
     // thread2 = new Thread();
     thread3 = new Thread();
 
-    BLE &ble = BLE::Instance();
-
     thread1->start(led_thread);
     // thread2->start(sensor_thread);
-    thread3->start(bcg_thread);
+    thread3->start(callback(bcg_thread, &ble_process));
 
-    GattServerProcess ble_process(event_queue, ble);
     ble_process.on_init(callback(&smart_ppe_ble, &SmartPPEService::start));
 
     ble_process.start();
