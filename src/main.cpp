@@ -18,9 +18,8 @@
 
 #include "PinNames.h"
 #include "mbed.h"
-
+#include "LowPowerTicker.h"
 #include "SPI.h"
-#include "I2C.h"
 #include "SWO.h"
 #include "SWOLogger.h"
 
@@ -29,12 +28,11 @@
 #include "Si7051.h"
 
 #include "SmartPPEService.h"
+#include "BCG.h"
 
 DigitalOut led(LED1);
-BusControl *bus_control = BusControl::get_instance();
 
 SWO_Channel SWO; // for SWO logging
-I2C i2c(I2C_SDA0, I2C_SCL0);
 SPI spi(SPI_MOSI, SPI_MISO, SPI_SCK);
 
 Si7051 temp(&i2c);
@@ -54,6 +52,7 @@ Thread *thread2;
 
 SmartPPEService smart_ppe_ble;
 
+Thread t1;
 void led_thread()
 {
     while(1)
@@ -61,9 +60,10 @@ void led_thread()
         led = 0;
         ThisThread::sleep_for(2000ms);
         led = 1;
-        ThisThread::sleep_for(10ms);
+        ThisThread::sleep_for(100ms);
     }
 }
+static events::EventQueue event_queue(/* event count */ 16 * EVENTS_EVENT_SIZE);
 
 void sensor_thread()
 {   
@@ -131,6 +131,10 @@ void sensor_thread()
 int main()
 {
     swo.claim();
+    
+    t1.start(led_thread);
+    
+    BCG bcg(&spi, IMU_INT1, IMU_CS);
 
     bus_control->init();
     ThisThread::sleep_for(10ms);
