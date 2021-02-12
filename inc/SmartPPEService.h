@@ -61,7 +61,7 @@ public:
             printf("Allocation of mic characteristic failed\r\n");
         }
 
-        _data_ready = new ReadOnlyGattCharacteristic<uint8_t> (data_ready_uuid, &_initial_value_uint8_t);
+        _data_ready = new ReadOnlyGattCharacteristic<uint8_t> (data_ready_uuid, &_initial_value_uint8_t, GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_NOTIFY);
         if (!_data_ready) {
             printf("Allocation of data quality characteristic failed\r\n");
         }
