@@ -87,7 +87,8 @@ public:
             _respiratory_rate,
             _bcg,
             _fit,
-            _data_ready };
+            _data_ready,
+            _time};
         GattService smart_ppe_service(uuid, charTable, 6);
 
         _server = &ble.gattServer();
@@ -204,7 +205,6 @@ public:
         uint8_t epoch_time_array[8];
 
         _server->read(_time->getValueHandle(), epoch_time_array, &length);
-
         uint64_t epoch_time = 0;
         std::memcpy(&epoch_time, epoch_time_array, 8);
 
