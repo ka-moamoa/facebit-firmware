@@ -44,8 +44,8 @@ private:
      * STD_DEV_THRESHOLD before we calculate 
      * a heart rate based on them.
      */
-    uint8_t NUM_EVENTS = 6;
-    float STD_DEV_THRESHOLD = 4.5;
+    uint8_t NUM_EVENTS = 6; // number of sequential events
+    float STD_DEV_THRESHOLD = 4.5; // in BPM
 
     double _l2norm(double x, double y, double z);
 };
