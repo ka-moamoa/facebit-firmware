@@ -1,5 +1,9 @@
 #include "BCG.h"
 #include "SWOLogger.h"
+#include "Utilites.h"
+#include <numeric>
+
+using namespace std::chrono;
 
 BCG::BCG(SPI *spi, PinName int1_pin, PinName cs) : 
 _g_drdy(int1_pin)
@@ -13,7 +17,7 @@ BCG::~BCG()
 {
 }
 
-float BCG::bcg(const uint16_t num_samples)
+bool BCG::bcg(const seconds num_seconds)
 {
     // turn on SPI bus
     _bus_control->init();
@@ -76,16 +80,16 @@ float BCG::bcg(const uint16_t num_samples)
     // init some tracker variables
     float last_bcg_val = -1.0;
     uint32_t acquired_samples = 0;
-    uint8_t num_zc = 0;
-    vector<float> descending_zc_timestamps;
+    vector<double> last_crosses;
+    bool new_hr_reading = false;
+
     LowPowerTimer zc_timer;
     zc_timer.start();
 
     // printf("ts, x, y, z, x1, y1, y2, l2norm, bcg, zc\r\n");
 
-    // acquire and process samples until we have as many as asked for
-    // while(acquired_samples < num_samples)
-    while(1)
+    // acquire and process samples until num_seconds has elapsed
+    while(zc_timer.elapsed_time() <= duration_cast<microseconds>(num_seconds))
     {
         if (_g_drdy.read())        
         {
@@ -114,17 +118,59 @@ float BCG::bcg(const uint16_t num_samples)
 
             // send l2norm through hr isolation filter
             float next_bcg_val = hr_isolation.step(mag);
-            printf("%f, %f\r\n", zc_timer.read(), next_bcg_val);
+            // printf("%f, %f\r\n", zc_timer.read(), next_bcg_val);
             
             // look for a descending zero-cross
             if (last_bcg_val > 0 && next_bcg_val <= 0)
             {
-                float zc_ts = zc_timer.read();
-                descending_zc_timestamps.push_back(zc_ts);
+                double zc_ts = (double)zc_timer.read();
+                last_crosses.push_back(zc_ts);
 
-                // printf("1\r\n");
-    
-                num_zc++;
+                if (last_crosses.size() >= NUM_EVENTS)
+                {
+                    /**
+                     * Now see if the last NUM_EVENTS crosses warrant a heart rate calculation,
+                     * by checking the standard deviation of the instantaneous heart rates 
+                     * derived from them. If the standard deviation falls below our STD_DEV_THRESHOLD,
+                     * use them to calculate a heart rate and save to the vector.
+                     */
+                    vector<double> crosses_copy = last_crosses;
+                    // LOG_INFO("raw: %f", crosses_copy[0]);
+                    std::adjacent_difference(crosses_copy.begin(), crosses_copy.end(), crosses_copy.begin());
+                    crosses_copy.erase(crosses_copy.begin());
+                    Utilities::reciprocal(crosses_copy); // get element-wise frequency
+                    // LOG_INFO("%f", crosses_copy[0]);
+                    Utilities::multiply(crosses_copy, 60.0); // get element-wise heart rate
+                    // LOG_INFO("%f", crosses_copy[0]);
+                    float std_dev = Utilities::std_dev(crosses_copy); // calculate standard deviation across the heart rates
+                    // LOG_INFO("%f", crosses_copy[0]);
+                    
+                    if (std_dev < STD_DEV_THRESHOLD) // we have some stable readings! calculate heart rate
+                    {
+                        new_hr_reading = true;
+
+                        HR_t new_hr;
+                        new_hr.rate = Utilities::mean(crosses_copy);
+                        new_hr.timestamp = time(NULL);
+
+                        LOG_INFO("New HR reading --> rate: %0.1f, time: %lli", new_hr.rate, new_hr.timestamp);
+
+                        while (_HR.size() >= HR_BUFFER_SIZE)
+                        {
+                            _HR.erase(_HR.begin());
+                        }
+
+                        _HR.push_back(new_hr);
+                    }
+
+                    // now remove first element from last_crosses vector to keep it at NUM_EVENTS length
+                    while(last_crosses.size() >= NUM_EVENTS)
+                    {
+                        last_crosses.erase(last_crosses.begin());
+                    }
+                }
+
+                // printf("1\r\n");    
             }
             else
             {
@@ -141,31 +187,7 @@ float BCG::bcg(const uint16_t num_samples)
     float collection_time = zc_timer.read();
     zc_timer.stop();
 
-    // now that we've collected and processed the samples, let's see how clean the signal looks
-    if (num_zc < 3)
-    {
-        LOG_WARNING("Not enough zero-crosses to detect HR! Detected only %u.", num_zc);
-        return -1;
-    }
-    if (collection_time < 3)
-    {
-        LOG_WARNING("Collection time not long enough to calculate HR! Only %0.2f s", collection_time);
-    }
-    // others checks here as we come up with them...
-
-    // calculate inter-beat intervals -> instananeous HRs -> average them
-    float HR_sum = 0;
-    for (int i = 1; i < descending_zc_timestamps.size(); i++) // start at index 2
-    {
-        float interval = descending_zc_timestamps.at(i) - descending_zc_timestamps.at(i-1);
-        float instant_HR = 1.0 / interval * 60.0;
-        HR_sum += instant_HR;
-    }
-
-    float HR = HR_sum / descending_zc_timestamps.size();
-    LOG_INFO("HR = %0.1f", HR);
-
-    return HR;
+    return new_hr_reading;
 }
 
 double BCG::_l2norm(double x, double y, double z)
@@ -322,3 +344,28 @@ double BCG::_l2norm(double x, double y, double z)
                 //     }
                 //     LOG_INFO("HR = %f", result);
                 // }
+
+
+    // // now that we've collected and processed the samples, let's see how clean the signal looks
+    // if (num_zc < 3)
+    // {
+    //     LOG_WARNING("Not enough zero-crosses to detect HR! Detected only %u.", num_zc);
+    //     return -1;
+    // }
+    // if (collection_time < 3)
+    // {
+    //     LOG_WARNING("Collection time not long enough to calculate HR! Only %0.2f s", collection_time);
+    // }
+    // // others checks here as we come up with them...
+
+    // // calculate inter-beat intervals -> instananeous HRs -> average them
+    // float HR_sum = 0;
+    // for (int i = 1; i < descending_zc_timestamps.size(); i++) // start at index 2
+    // {
+    //     float interval = descending_zc_timestamps.at(i) - descending_zc_timestamps.at(i-1);
+    //     float instant_HR = 1.0 / interval * 60.0;
+    //     HR_sum += instant_HR;
+    // }
+
+    // float HR = HR_sum / descending_zc_timestamps.size();
+    // LOG_INFO("HR = %0.1f", HR);

@@ -69,15 +69,15 @@ int main()
     uint16_t num_samples = 20 * bcg.get_frequency(); // 10 seconds of data
     Timer timer;
     timer.start();
-    while(timer.read() < 10.0)
-    {
-        printf("%0.1f\r\n", timer.read());
-        ThisThread::sleep_for(100ms);
-    }
+    // while(timer.read() < 10.0)
+    // {
+    //     printf("%0.1f\r\n", timer.read());
+    //     ThisThread::sleep_for(100ms);
+    // }
 
     while(1)
     {
-        bcg.bcg(num_samples);
+        bcg.bcg(100s);
         // printf("\r\n\n\n\n\n");
         ThisThread::sleep_for(5s);
     }
