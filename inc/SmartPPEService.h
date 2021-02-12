@@ -89,7 +89,8 @@ public:
             _fit,
             _data_ready,
             _time};
-        GattService smart_ppe_service(uuid, charTable, 6);
+
+        GattService smart_ppe_service(uuid, charTable, 7);
 
         _server = &ble.gattServer();
 
