@@ -19,7 +19,7 @@ BCG::~BCG()
 
 BCG::HR_t BCG::get_buffer_element()
 {
-    HR_t tmp = _HR.at(1);
+    HR_t tmp = _HR.at(0);
     _HR.erase(_HR.begin());
     return tmp;
 }
@@ -146,23 +146,27 @@ bool BCG::bcg(const seconds num_seconds)
                     
                     if (std_dev < STD_DEV_THRESHOLD) // we have some stable readings! calculate heart rate
                     {
-                        new_hr_reading = true;
-
                         float rate_raw = Utilities::mean(crosses_copy);
                         uint8_t rate = (uint8_t)Utilities::round(rate_raw);
 
-                        HR_t new_hr;
-                        new_hr.rate = rate;
-                        new_hr.timestamp = time(NULL);
-
-                        LOG_INFO("New HR reading --> rate: %0.1f, time: %lli", rate_raw, new_hr.timestamp);
-
-                        while (_HR.size() >= HR_BUFFER_SIZE)
+                        // bounds checking
+                        if (rate >= MIN_HR && rate <= MAX_HR)
                         {
-                            _HR.erase(_HR.begin());
-                        }
+                            new_hr_reading = true;
 
-                        _HR.push_back(new_hr);
+                            HR_t new_hr;
+                            new_hr.rate = rate;
+                            new_hr.timestamp = time(NULL);
+
+                            LOG_INFO("New HR reading --> rate: %0.1f, time: %lli", rate_raw, new_hr.timestamp);
+
+                            while (_HR.size() >= HR_BUFFER_SIZE)
+                            {
+                                _HR.erase(_HR.begin());
+                            }
+
+                            _HR.push_back(new_hr);
+                        }
                     }
 
                     // now remove first element from last_crosses vector to keep it at NUM_EVENTS length

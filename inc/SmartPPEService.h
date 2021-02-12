@@ -61,7 +61,7 @@ public:
             printf("Allocation of mic characteristic failed\r\n");
         }
 
-        _data_ready = new ReadOnlyGattCharacteristic<uint8_t> (data_ready_uuid, &_initial_value_data_ready, GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_NOTIFY);
+        _data_ready = new ReadWriteGattCharacteristic<uint8_t> (data_ready_uuid, &_initial_value_data_ready, GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_NOTIFY);
         if (!_data_ready) {
             printf("Allocation of data quality characteristic failed\r\n");
         }
@@ -163,7 +163,7 @@ public:
         uint8_t rr = heart_rate;
         std::memcpy(&bytearray[8], &rr, 1);
 
-        _server->write(_respiratory_rate->getValueHandle(), bytearray, 9);
+        _server->write(_bcg->getValueHandle(), bytearray, 9);
     }
 
     void updateDataReady(data_ready_t type)
@@ -189,7 +189,7 @@ private:
     ReadOnlyArrayGattCharacteristic<uint8_t, 9>* _respiratory_rate = nullptr;
     ReadOnlyArrayGattCharacteristic<uint8_t, 9>* _bcg = nullptr;
     ReadOnlyArrayGattCharacteristic<uint8_t, 9>* _fit = nullptr;
-    ReadOnlyGattCharacteristic<uint8_t>* _data_ready = nullptr;
+    ReadWriteGattCharacteristic<uint8_t>* _data_ready = nullptr;
 
     uint8_t _initial_value_data_ready = NO_DATA;
     uint8_t _initial_value_uint8_t = 0;
