@@ -3,6 +3,7 @@
 RespiratoryRate::RespiratoryRate(CapCalc &cap, Si7051 &temp) : _cap(cap),
                                                                _temp(temp)
 {
+    _bus_control = BusControl::get_instance();
 }
 
 RespiratoryRate::~RespiratoryRate()
@@ -67,9 +68,9 @@ RespiratoryRate::RR_d RespiratoryRate::calc_resp_rate(float samples[], int SAMPL
 void RespiratoryRate::get_resp_rate()
 {
     printf("Resp Sensing\n\r");
-    if ((_cap.calc_joules() > SENSING_ENERGY && _cap.read_voltage() > MIN_VOLTAGE))
+    // if ((_cap.calc_joules() > SENSING_ENERGY && _cap.read_voltage() > MIN_VOLTAGE))
     {
-        bus_control->i2c_power(true);
+        _bus_control->i2c_power(true);
         ThisThread::sleep_for(1000ms);
 
         _temp.initialize();
@@ -93,7 +94,7 @@ void RespiratoryRate::get_resp_rate()
             uint16_t *buffer = _temp.getBuffer();
             for (int j = 0; j < _temp.getBufferSize(); j++)
             {
-                //printf("Data %d\r\n", buffer[j]);
+                printf("Data %d\r\n", buffer[j]);
                 samples[i] = (buffer[j] / 100.0);
                 sum = sum + samples[i];
                 i++;
@@ -103,14 +104,14 @@ void RespiratoryRate::get_resp_rate()
         }
         // convert to floating points
         float mean = (sum) / SAMPLE_SIZE;
-        //printf("Mean %f\r\n", mean);
+        printf("Mean %f\r\n", mean);
         resp_rate = calc_resp_rate(samples, SAMPLE_SIZE, mean);
         //}
 
         RR_t new_rate;
-        //printf("Breath count %d \r\n", resp_rate.breath_count);
+        printf("Breath count %d \r\n", resp_rate.breath_count);
         new_rate.rate = ((60.0 * resp_rate.breath_count) / resp_rate.duration);
-        //printf("RR %d bpm\r\n", new_rate.rate);
+        printf("RR %d bpm\r\n", new_rate.rate);
         new_rate.timestamp = time(NULL);
         //respiratory_rate_buffer.push_back(new_rate);
     }

@@ -29,7 +29,7 @@ public:
 private:
     CapCalc &_cap;
     Si7051 &_temp;
-    BusControl *bus_control;
+    BusControl *_bus_control;
 
     vector<RR_t> respiratory_rate_buffer;
 
