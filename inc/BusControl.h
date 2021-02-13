@@ -12,7 +12,8 @@ public:
         FRAM,
         MAGNETOMETER,
         BAROMETER,
-        IMU
+        IMU,
+        SPI_LAST
     };
 
     BusControl(BusControl &other) = delete;
@@ -21,8 +22,13 @@ public:
     static BusControl* get_instance();
 
     void init(void);
+
+    void set_power_lock(SPIDevices device, bool lock);
+
     void spi_power(bool power);
     void i2c_power(bool power);
+    
+    void blink_led();
 
     bool get_spi_power();
     bool get_i2c_power();
@@ -49,11 +55,25 @@ private:
     // I2C pullup
     DigitalOut _i2c_pu; // must be high drive
 
+    DigitalOut _led; // must be high drive
+
     // Initialized flag
     bool _initialized = false;
 
+    struct power_lock_t
+    {
+        bool fram;
+        bool magnetometer;
+        bool barometer;
+        bool imu;
+    };
+
+    power_lock_t power_lock;
+
     static BusControl* _instance;
     static Mutex _mutex;
+
+    const float LED_ENERGY = 0.001;
 
     bool _spi_power = false;
     bool _i2c_power = false;

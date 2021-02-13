@@ -20,7 +20,6 @@ BCG::~BCG()
 bool BCG::bcg(const seconds num_seconds)
 {
     // turn on SPI bus
-    _bus_control->init();
     _bus_control->spi_power(true);
 
     // speed up bus to reduce transaction time

@@ -5,17 +5,25 @@
 
 class CapCalc
 {
+public:
+    static CapCalc* get_instance();
+
+    float read_voltage();
+    float calc_joules();
+
+    CapCalc(CapCalc &other) = delete;
+    void operator=(const CapCalc &) = delete;
+
 private:
+    CapCalc();
+    ~CapCalc();
+
+    static CapCalc *_instance;
+    static Mutex _mutex;
+
     AnalogIn _cap_voltage;
     DigitalOut _cap_voltage_en;
-    uint32_t _capacitance_uF;
-
-public:
-    CapCalc(PinName cap_voltage, PinName cap_voltage_en, uint32_t capacitance_uF);
-    ~CapCalc();
-    
-    float read_capacitor_voltage();
-    float calc_joules();
+    uint32_t _capacitance_uF = 3000;
 };
 
 #endif // CAPCALC_H_

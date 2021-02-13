@@ -1,307 +1,39 @@
-#include "gatt_server_process.h"
-#include "SmartPPEService.h"
-
 #include "mbed.h"
 #include "LowPowerTicker.h"
-#include "PinNames.h"
 
-#include "SPI.h"
-#include "I2C.h"
 #include "SWO.h"
 #include "SWOLogger.h"
 
-#include "CapCalc.h"
 #include "BusControl.h"
-#include "Barometer.hpp"
-#include "Si7051.h"
 
-#include "BCG.h"
+#include "FaceBitState.hpp"
 
-using namespace std::literals::chrono_literals;
+FaceBitState facebit;
 
 static events::EventQueue task_queue(16 * EVENTS_EVENT_SIZE);
-static events::EventQueue ble_queue(16 * EVENTS_EVENT_SIZE);
-LowPowerTicker lpt_led, lpt_resp_rate;
-
-// Frequency configuration of each task
-const milliseconds LED_TASK = 1000ms;
-const milliseconds RESP_TASK = 120000ms; //10mins
-
-DigitalOut led(LED1);
-BusControl *bus_control = BusControl::get_instance();
-CapCalc cap(VCAP, VCAP_ENABLE, 3000);
-
-SWO_Channel SWO; // for SWO logging
-SWO_Channel swo("channel");
-
-SPI spi(SPI_MOSI, SPI_MISO, SPI_SCK);
-I2C i2c(I2C_SDA0, I2C_SCL0);
-
-Si7051 temp(&i2c);
-Barometer barometer(&spi, BAR_CS, BAR_DRDY);
-
 Thread thread1;
 
+SWO_Channel swo("channel");
 
-// Globals:
-float cap_voltage = 0;
-float available_energy = 0;
-const float MIN_VOLTAGE = 2.3;
-
-const int LED_ENERGY = 0.001;
-const int SENSING_ENERGY = 0.001;
-
-const bool RUN_LED = false;
-const bool RUN_SENSING = false;
-
-SmartPPEService smart_ppe_ble;
-
-void check_voltage()
+void blink()
 {
-    available_energy = cap.calc_joules();
-    cap_voltage = cap.read_capacitor_voltage();
-    LOG_DEBUG("Voltage: %0.2f\r\n", cap_voltage);
-    LOG_DEBUG("Energy: %0.2f\r\n", available_energy);
-}
-
-void led_thread()
-{
-    check_voltage();
-    LOG_TRACE("%s", "LED\r\n");
-    if (RUN_LED || (available_energy > LED_ENERGY))
+    while(1)
     {
-        led = 1;
-        ThisThread::sleep_for(10ms);
-        led = 0;
+        BusControl::get_instance()->blink_led();
+        ThisThread::sleep_for(1s);
     }
 }
-
-int calc_resp_rate(float samples[], int SAMPLE_SIZE, float mean)
-{
-    int i = 1;
-    uint8_t max_count = 0;
-    float local_max = 0;
-    float max_average = 0;
-    float delta = 0.5;
-    while (i < SAMPLE_SIZE)
-    {
-        if (samples[i] - mean > 0)
-        {
-            if (local_max < samples[i])
-            {
-                local_max = samples[i];
-            }
-        }
-        else if (samples[i] - mean <= 0)
-        {
-            if (local_max != 0)
-            {
-                if (max_average != 0 && abs(local_max - max_average) < delta)
-                {
-                    max_count = max_count + 1;
-                    max_average = (max_average + local_max) / 2;
-                    local_max = 0;
-                }
-                else if (max_average == 0)
-                {
-                    max_count = max_count + 1;
-                    max_average = local_max;
-                    local_max = 0;
-                }
-            }
-        }
-        i = i + 1;
-    }
-    return max_count;
-}
-
-void get_resp_rate()
-{
-    check_voltage();
-    printf("Resp Sensing\n\r");
-    if (RUN_SENSING || (available_energy > SENSING_ENERGY && cap_voltage > MIN_VOLTAGE))
-    {
-        bus_control->spi_power(true);
-        spi.frequency(5000000);
-
-        bus_control->i2c_power(true);
-
-        ThisThread::sleep_for(1000ms);
-        int resp_count = 0;
-        temp.initialize();
-
-        int total_windows = 2;
-        int breath_count = 0;
-        for (int window = 0; window < total_windows; window++)
-        {
-            const int SAMPLE_SIZE = 300;
-            float samples[SAMPLE_SIZE] = {};
-            float sum = 0;
-
-            for (int i = 0; i < SAMPLE_SIZE;)
-            {
-                barometer.update();
-                while (!barometer.get_buffer_full())
-                    barometer.update();
-                smart_ppe_ble.updatePressure(
-                    barometer.get_delta_timestamp(true),
-                    barometer.get_measurement_frequencyx100(),
-                    barometer.get_pressure_array(),
-                    barometer.get_pressure_buffer_size());
-
-                smart_ppe_ble.updateDataReady(smart_ppe_ble.PRESSURE);
-
-                barometer.clear_buffers();
-
-                temp.update();
-                while (!temp.getBufferFull())
-                    temp.update();
-
-                smart_ppe_ble.updateTemperature(
-                    temp.getDeltaTimestamp(true),
-                    temp.getFrequencyx100(),
-                    temp.getBuffer(),
-                    temp.getBufferSize());
-
-                smart_ppe_ble.updateDataReady(smart_ppe_ble.TEMPERATURE);
-
-                uint16_t *buffer = temp.getBuffer();
-                for (int j = 0; j < temp.getBufferSize(); j++)
-                {
-                    samples[i] = (buffer[j] / 100.0);
-                    sum = sum + samples[i];
-                    i++;
-                }
-                temp.clearBuffer();
-                ThisThread::sleep_for(50ms);
-
-                // convert to floating points
-                float mean = (sum) / SAMPLE_SIZE;
-                printf("Mean %f\r\n", mean);
-                breath_count += calc_resp_rate(samples, SAMPLE_SIZE, mean);
-            }
-
-            printf("Breath Count %d\r\n", breath_count);
-            smart_ppe_ble.updateRespiratoryRate(temp.getDeltaTimestamp(true), breath_count);
-            smart_ppe_ble.updateDataReady(smart_ppe_ble.RESPIRATORY_RATE);
-            fflush(stdout);
-            ThisThread::sleep_for(1ms);
-            resp_count = resp_count + 1;
-        }
-    }
-}
-
-void sensor_thread()
-{
-    bus_control->spi_power(true);
-    spi.frequency(5000000);
-
-    bus_control->i2c_power(true);
-
-    ThisThread::sleep_for(1000ms);
-
-    temp.initialize();
-
-    if (!barometer.initialize() || !barometer.set_fifo_full_interrupt(true))
-    {
-        LOG_WARNING("%s", "barometer failed to initialize");
-        while (1)
-        {
-        };
-    }
-
-    if (!barometer.set_pressure_threshold(1100) || !barometer.enable_pressure_threshold(true, true, false))
-    {
-        LOG_WARNING("%s", "barometer setup failed");
-        while (1)
-        {
-        };
-    }
-
-    barometer.update();
-    temp.update();
-
-    if (barometer.get_buffer_full())
-    {
-        LOG_DEBUG("barometer buffer full. %u elements. timestamp = %llu. measurement frequency x100 = %lu", barometer.get_pressure_buffer_size(), barometer.get_delta_timestamp(false), barometer.get_measurement_frequencyx100());
-
-        smart_ppe_ble.updatePressure(
-            barometer.get_delta_timestamp(true),
-            barometer.get_measurement_frequencyx100(),
-            barometer.get_pressure_array(),
-            barometer.get_pressure_buffer_size());
-
-        smart_ppe_ble.updateDataReady(smart_ppe_ble.PRESSURE);
-
-        barometer.clear_buffers();
-    }
-
-    if (temp.getBufferFull())
-    {
-        LOG_DEBUG("temperature buffer full. %u elements. timestamp = %llu. measurement frequency x100 = %lu", temp.getBufferSize(), temp.getDeltaTimestamp(false), temp.getFrequencyx100());
-
-        smart_ppe_ble.updateTemperature(
-            temp.getDeltaTimestamp(true),
-            temp.getFrequencyx100(),
-            temp.getBuffer(),
-            temp.getBufferSize());
-
-        smart_ppe_ble.updateDataReady(smart_ppe_ble.TEMPERATURE);
-
-        temp.clearBuffer();
-    }
-    ThisThread::sleep_for(1ms);
-    
-}
-void t1()
-{
-    task_queue.call(led_thread);
-}
-void t2()
-{
-    task_queue.call(get_resp_rate);
-}
-
 
 int main()
 {
+    BusControl::get_instance()->init();
+
     swo.claim();
-    
-    BCG bcg(&spi, IMU_INT1, IMU_CS);
+    LOG_INFO("%s", "PROGRAM STARTING");
 
-    bus_control->init();
-    ThisThread::sleep_for(10ms);
-    
-    bus_control->spi_power(true);
-    spi.frequency(5000000);
+    thread1.start(blink);
 
-    bus_control->i2c_power(true);
-
-    ThisThread::sleep_for(1000ms);
-
-    if (!barometer.initialize() || !barometer.set_fifo_full_interrupt(true))
-    {
-        LOG_WARNING("%s", "barometer failed to initialize");
-        while (1)
-        {
-        };
-    }
-
-    if (!barometer.set_pressure_threshold(1100) || !barometer.enable_pressure_threshold(true, true, false))
-    {
-        LOG_WARNING("%s", "barometer setup failed");
-        while (1)
-        {
-        };
-    }
-
-    BLE &ble = BLE::Instance();
-
-    lpt_led.attach(t1, 4000ms);
-    lpt_resp_rate.attach(t2, 120000ms);
-    thread1.start(callback(&task_queue, &EventQueue::dispatch_forever));
-    GattServerProcess ble_process(ble_queue, ble);
-    ble_process.on_init(callback(&smart_ppe_ble, &SmartPPEService::start));
+    facebit.run();
 
     return 0;
 }
