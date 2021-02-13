@@ -106,28 +106,52 @@ void FaceBitState::update_state()
             if(_mask_state_timer.read_ms() > ACTIVE_STATE_TIMEOUT)
             {
                 _next_mask_state = OFF_FACE_INACTIVE;
+                _next_task_state = IDLE;
             }
 
             break;
         }
         
         case ON_FACE:
-
+        {
         _sleep_duration = ON_FACE_SLEEP_DURATION;
 
             switch(_task_state)
             {
                 case IDLE:
+                {
+                    uint32_t ts = _mask_state_timer.read_ms();
+
+                    if (ts - _last_rr_ts >= RR_PERIOD)
+                    {
+                        _next_task_state = RESPIRATION_RATE;
+                    }
+                    else if (ts - _last_hr_ts >= HR_PERIOD)
+                    {
+                        _next_task_state = HEART_RATE;
+                    }
+                    else if(ts - _last_mf_ts > MASK_FIT_PERIOD)
+                    {
+                        _next_task_state = MASK_FIT;
+                    }
+                    else if (ts - _last_ble_ts > BLE_BROADCAST_PERIOD)
+                    {
+                        _next_task_state = BLE_BROADCAST;
+                    }
 
                     break;
-
+                }
                 case RESPIRATION_RATE:
 
                     break;
 
                 case HEART_RATE:
+                {
+                    BCG bcg(&_spi, (PinName)IMU_INT1, (PinName)IMU_CS);
+                    
 
                     break;
+                }
 
                 case MASK_FIT:
 
@@ -143,10 +167,45 @@ void FaceBitState::update_state()
             }
 
             break;
+        }
 
             default:
                 _next_mask_state = OFF_FACE_INACTIVE; 
                 break;
+    }
+
+    if (_mask_state == ON_FACE && _task_state != _next_task_state)
+    {
+        /**
+         * We want to run mask on/off detection before every
+         * new task, so we don't waste energy on the task (and get
+         * an inaccurate result) if the mask is off.
+         */
+        Barometer barometer(&_spi, (PinName)BAR_CS, (PinName)BAR_DRDY);
+        MaskStateDetection mask_state(&barometer);
+
+        MaskStateDetection::MASK_STATE_t mask_status;
+        mask_status = mask_state.is_on(); // blocking call for ~5s
+
+        if (mask_status == MaskStateDetection::ON)
+        {
+            LOG_INFO("%s", "MASK ON");
+        }
+        else if (mask_status == MaskStateDetection::OFF)
+        {
+            LOG_INFO("%s", "MASK OFF");
+            _next_task_state = IDLE;
+            _next_mask_state = OFF_FACE_ACTIVE;
+        }
+        else if (mask_status == MaskStateDetection::ERROR)
+        {
+            LOG_WARNING("%s", "MASK DETECTION ERROR");
+            _next_task_state = IDLE; // don't run if we don't know
+        }
+
+        _new_task_state = true;
+        _task_state = _next_task_state;
+        LOG_INFO("TASK STATE: %i", _task_state);
     }
 
     if (_mask_state != _next_mask_state)

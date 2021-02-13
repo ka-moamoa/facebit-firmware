@@ -58,11 +58,21 @@ private:
     uint32_t ACTIVE_STATE_TIMEOUT = 60000;
     milliseconds ON_FACE_SLEEP_DURATION = 1000ms;
 
+    const uint32_t RR_PERIOD = 5 * 60 * 1000; // 5 min
+    const uint32_t HR_PERIOD = 1 * 60 * 1000; // 1 min
+    const uint32_t MASK_FIT_PERIOD = 1 * 60 * 1000; // 1 min
+    const uint32_t BLE_BROADCAST_PERIOD = 5 * 60 * 1000; // 5 min
+
+    const uint32_t _last_rr_ts = 0;
+    const uint32_t _last_hr_ts = 0;
+    const uint32_t _last_mf_ts = 0;
+    const uint32_t _last_ble_ts = 0;
+
+    LowPowerTimer _mask_state_timer; // gets reset and started whenever mask state changes
+    LowPowerTimer _task_state_timer; // gets reset and started when MASK_ON is entered
 
     void imu_int_handler();
     bool get_imu_int();
-
-    LowPowerTimer _mask_state_timer;
 };
 
 
