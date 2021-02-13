@@ -11,17 +11,20 @@ using namespace std::chrono;
 class BCG
 {
 public:
+    typedef struct
+    {
+        uint8_t rate;
+        time_t timestamp;
+    } HR_t;
+
     BCG(SPI *spi, PinName int1_pin, PinName cs);
     ~BCG();
 
     bool bcg(const seconds num_seconds);
     float get_frequency() { return G_FREQUENCY; }
 
-    typedef struct
-    {
-        float rate;
-        time_t timestamp;
-    } HR_t;
+    uint8_t get_buffer_size() { return _HR.size(); };
+    HR_t get_buffer_element();
 
 private:
     BusControl *_bus_control;
@@ -46,6 +49,9 @@ private:
      */
     uint8_t NUM_EVENTS = 6; // number of sequential events
     float STD_DEV_THRESHOLD = 4.5; // in BPM
+
+    uint8_t MIN_HR = 45; // BPM below this limit are filtered out during the HR_isolation stage
+    uint8_t MAX_HR = 150; // BPM above this limit are filtered out during the HR_isolation stage
 
     double _l2norm(double x, double y, double z);
 };
