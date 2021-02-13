@@ -62,10 +62,10 @@ float RespiratoryRate::calc_resp_rate(float samples[], int SAMPLE_SIZE, float me
         //printf("%d, %0.2f\r\n",i,samples[i]);
         i = i + 1;
     }
-    for(int i=0; i < peak_indices.size(); i++)
-        printf("I: %d\r\n",peak_indices.at(i));
+    //for(int i=0; i < peak_indices.size(); i++)
+        //printf("I: %d\r\n",peak_indices.at(i));
     //printf("Time : %d %d",last_peak,first_peak);
-    printf("indices : %d %d",peak_indices.back(),peak_indices.front());
+    //printf("indices : %d %d",peak_indices.back(),peak_indices.front());
     //printf("%d, %f, %d, ",i,sample[i],
     float duration = (peak_indices.back() - peak_indices.front())/_temp.getMeasurementFrequency();
     float resp_rate = (60*(max_count-1))/duration;
