@@ -70,11 +70,12 @@ public:
 	uint8_t getBufferSize() { return _tempx100_array.size(); };
 	uint16_t* getBuffer() { return _tempx100_array.data(); };
 	uint64_t getDeltaTimestamp(bool broadcast);
+	uint8_t getMeasurementFrequency(){ return _measurement_frequency_hz;}
 private:
 	uint8_t _address;
 	I2C *_i2c;
 	std::vector<uint16_t> _tempx100_array;
-	uint8_t _measurement_frequency_hz = 20; // Hz
+	uint8_t _measurement_frequency_hz = 10; // Hz
 	LowPowerTimer _frequency_timer;
 	LowPowerTimer _timer;
 	uint64_t _relative_measurement_timestamp = 0;
@@ -96,7 +97,7 @@ private:
 	
 	const uint8_t MEASUREMENT_TIMEOUT_MS = 20; 
 
-	const uint8_t MAX_BUFFER_SIZE = 100;
+	const uint8_t MAX_BUFFER_SIZE = 50;
 };
 
 #endif

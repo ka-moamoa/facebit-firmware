@@ -20,7 +20,7 @@ public:
     typedef struct
     {
         int breath_count;
-        uint64_t duration;
+        float duration;
     } RR_d;
 
     RespiratoryRate::RR_d calc_resp_rate(float samples[], int SAMPLE_SIZE, float mean);
@@ -30,6 +30,7 @@ private:
     CapCalc &_cap;
     Si7051 &_temp;
     BusControl *_bus_control;
+    LowPowerTimer _temp_timer;
 
     vector<RR_t> respiratory_rate_buffer;
 

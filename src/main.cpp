@@ -30,10 +30,10 @@ void blink()
 }
 void resp_rate()
 {
-    //while(1)
+    while(1)
     {
         rr.get_resp_rate();
-        ThisThread::sleep_for(20s);
+        ThisThread::sleep_for(10s);
     }
 }
 
