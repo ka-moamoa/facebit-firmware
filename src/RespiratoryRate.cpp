@@ -10,7 +10,7 @@ RespiratoryRate::~RespiratoryRate()
 {
 }
 
-RespiratoryRate::RR_d RespiratoryRate::calc_resp_rate(float samples[], int SAMPLE_SIZE, float mean)
+float RespiratoryRate::calc_resp_rate(float samples[], int SAMPLE_SIZE, float mean)
 {
     int i = 1;
     uint8_t max_count = 0;
@@ -20,7 +20,7 @@ RespiratoryRate::RR_d RespiratoryRate::calc_resp_rate(float samples[], int SAMPL
     float delta = 0.5;
     int first_peak;
     int last_peak;
-    //vector<uint64_t> peak_time;
+    vector<int> peak_indices;
     while (i < SAMPLE_SIZE)
     {
         if (samples[i] - mean > 0)
@@ -46,26 +46,30 @@ RespiratoryRate::RR_d RespiratoryRate::calc_resp_rate(float samples[], int SAMPL
                         last_peak = local_max_index;
                     }
                     max_count = max_count + 1;
-                    //peak_time.push_back(time(NULL));
+                    peak_indices.push_back(local_max_index);
                     max_average = (max_average + local_max) / 2;
                     local_max = 0;
                 }
                 else if (max_average == 0)
                 {
+                    peak_indices.push_back(local_max_index);
                     max_count = max_count + 1;
                     max_average = local_max;
                     local_max = 0;
                 }
             }
         }
+        //printf("%d, %0.2f\r\n",i,samples[i]);
         i = i + 1;
     }
-    printf("Time : %d %d",last_peak,first_peak);
-    float duration = (last_peak - first_peak)/_temp.getMeasurementFrequency();
-    RR_d result;
-    result.duration = duration;
-    result.breath_count = max_count;
-    return result;
+    for(int i=0; i < peak_indices.size(); i++)
+        printf("I: %d\r\n",peak_indices.at(i));
+    //printf("Time : %d %d",last_peak,first_peak);
+    printf("indices : %d %d",peak_indices.back(),peak_indices.front());
+    //printf("%d, %f, %d, ",i,sample[i],
+    float duration = (peak_indices.back() - peak_indices.front())/_temp.getMeasurementFrequency();
+    float resp_rate = (60*(max_count-1))/duration;
+    return resp_rate;
 }
 
 void RespiratoryRate::get_resp_rate()
@@ -81,7 +85,7 @@ void RespiratoryRate::get_resp_rate()
 
         //int total_windows = 1;
         //int breath_count = 0;
-        RespiratoryRate::RR_d resp_rate;
+        
         //for (int window = 0; window < total_windows; window++)
         //{
         const int SAMPLE_SIZE = 150;
@@ -110,15 +114,11 @@ void RespiratoryRate::get_resp_rate()
         // convert to floating points
         float mean = (sum) / SAMPLE_SIZE;
         //printf("Mean %f\r\n", mean);
-        resp_rate = calc_resp_rate(samples, SAMPLE_SIZE, mean);
+        float resp_rate = calc_resp_rate(samples, SAMPLE_SIZE, mean);
         //}
 
-        RR_t new_rate;
-        printf("Breath count %d \r\n", resp_rate.breath_count);
-        //printf("Duration %f \r\n", resp_rate.duration);
-        new_rate.rate = ((60.0 * resp_rate.breath_count) / resp_rate.duration);
-        printf("RR %f bpm\r\n", ((60.0 * resp_rate.breath_count) / resp_rate.duration));
-        new_rate.timestamp = time(NULL);
+        
+        printf("RR %f bpm\r\n", resp_rate);
         //respiratory_rate_buffer.push_back(new_rate);
     }
 }

@@ -16,14 +16,9 @@ public:
         int rate;
         uint64_t timestamp;
     } RR_t;
-    
-    typedef struct
-    {
-        int breath_count;
-        float duration;
-    } RR_d;
 
-    RespiratoryRate::RR_d calc_resp_rate(float samples[], int SAMPLE_SIZE, float mean);
+
+    float calc_resp_rate(float samples[], int SAMPLE_SIZE, float mean);
     void get_resp_rate();
     
 private:
