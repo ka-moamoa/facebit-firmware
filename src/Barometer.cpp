@@ -35,7 +35,7 @@ bool Barometer::initialize()
         return false;
     }
 
-    if (_barometer.set_odr(25.0) == LPS22HB_ERROR)
+    if (_barometer.set_odr(BAROMETER_FREQUENCY) == LPS22HB_ERROR)
     {
         return false;
     }

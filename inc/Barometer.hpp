@@ -11,6 +11,8 @@ public:
     Barometer(SPI *spi, PinName cs_pin, PinName int_pin);
     ~Barometer();
 
+    const float BAROMETER_FREQUENCY = 25.0; //Hz
+
     bool initialize();
     bool update();
 
