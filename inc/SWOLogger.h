@@ -7,12 +7,21 @@ extern SWO_Channel SWO;
 
 enum
 {
+    TRACE_TRACE,
     TRACE_DEBUG,
     TRACE_INFO,
     TRACE_WARNING
 };
 
 const uint8_t trace_level = TRACE_DEBUG;
+
+#define LOG_TRACE(msg, ...) \
+{ \
+    if (trace_level <= TRACE_TRACE) \
+    { \
+        printf("[T] // %s, %i --> " msg "\r\n",  __FILE__, __LINE__, __VA_ARGS__); \
+    } \
+}
 
 #define LOG_DEBUG(msg, ...) \
 { \

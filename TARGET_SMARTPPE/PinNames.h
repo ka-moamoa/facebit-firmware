@@ -36,8 +36,8 @@
  * 
  */
 
-#ifndef MBED_PINNAMES_H
-#define MBED_PINNAMES_H
+#ifndef PPE_PINNAMES_H
+#define PPE_PINNAMES_H
 
 #include "cmsis.h"
 
