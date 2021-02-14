@@ -169,18 +169,24 @@ void FaceBitState::update_state()
                 case MEASURE_HEART_RATE:
                 {
                     LOG_INFO("%s", "MEASURING HR")
-                    _last_hr_ts = _mask_state_timer.read_ms();
-                    BCG bcg(&_spi, (PinName)IMU_INT1, (PinName)IMU_CS);
-                    if(bcg.bcg(10s)) // blocking
+                    // _last_hr_ts = _mask_state_timer.read_ms();
+                    // BCG bcg(&_spi, (PinName)IMU_INT1, (PinName)IMU_CS);
+                    // if(bcg.bcg(10s)) // blocking
+                    if (1)
                     {
-                        for(int i = 0; i < bcg.get_buffer_size(); i++)
+                        // for(int i = 0; i < bcg.get_buffer_size(); i++)
+                        if (1)
                         {
                             FaceBitData hr_data;
-                            BCG::HR_t hr = bcg.get_buffer_element();
+                            // BCG::HR_t hr = bcg.get_buffer_element();
+
+                            // hr_data.data_type = HEART_RATE;
+                            // hr_data.timestamp = hr.timestamp;
+                            // hr_data.value = hr.rate;
 
                             hr_data.data_type = HEART_RATE;
-                            hr_data.timestamp = hr.timestamp;
-                            hr_data.value = hr.rate;
+                            hr_data.timestamp = time(NULL);
+                            hr_data.value = 3;
 
                             data_buffer.push_back(hr_data);
                         }
@@ -287,20 +293,29 @@ bool FaceBitState::_sync_data()
 
     _ble_thread.start(callback(&ble_process, &GattServerProcess::start));
 
+    // wait for connection
+
     LowPowerTimer ble_timeout;
     ble_timeout.start();
     while(!ble_process.is_connected())
     {
         if (ble_timeout.read_ms() > BLE_CONNECTION_TIMEOUT)
         {
-            LOG_INFO("%s", "NO BLE CONNECTION");
+            LOG_INFO("%s", "TIMEOUT BEFORE BLE CONNECTION");
             ble_process.stop(); 
             _ble_thread.terminate();
             return false;
         }
 
-        ThisThread::sleep_for(1s);
+        ThisThread::sleep_for(250ms);
     }
+
+    ThisThread::sleep_for(100ms); // time enough for the phone to sync the time
+
+    // sync timestamp
+    _smart_ppe_ble.updateTime(time(NULL));
+    set_time(_smart_ppe_ble.getTime());
+
 
     for (int i = 0; i < data_buffer.size(); i++)
     {
