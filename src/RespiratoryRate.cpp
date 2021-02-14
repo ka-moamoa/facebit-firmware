@@ -9,17 +9,17 @@ RespiratoryRate::RespiratoryRate(CapCalc &cap, Si7051 &temp) : _cap(cap),
 RespiratoryRate::~RespiratoryRate()
 {
 }
-
 float RespiratoryRate::calc_resp_rate(float samples[], int SAMPLE_SIZE, float mean)
 {
     int i = 1;
     uint8_t max_count = 0;
     float local_max = 0;
-    int local_max_index=0;
+    int local_max_index = 0;
     float max_average = 0;
     float delta = 0.5;
     int first_peak;
     int last_peak;
+    float threshold = 0.1;
     vector<int> peak_indices;
     while (i < SAMPLE_SIZE)
     {
@@ -59,22 +59,26 @@ float RespiratoryRate::calc_resp_rate(float samples[], int SAMPLE_SIZE, float me
                 }
             }
         }
-        //printf("%d, %0.2f\r\n",i,samples[i]);
         i = i + 1;
     }
-    //for(int i=0; i < peak_indices.size(); i++)
-        //printf("I: %d\r\n",peak_indices.at(i));
-    //printf("Time : %d %d",last_peak,first_peak);
-    //printf("indices : %d %d",peak_indices.back(),peak_indices.front());
-    //printf("%d, %f, %d, ",i,sample[i],
-    float duration = (peak_indices.back() - peak_indices.front())/_temp.getMeasurementFrequency();
-    float resp_rate = (60*(max_count-1))/duration;
-    return resp_rate;
+    float duration = (peak_indices.back() - peak_indices.front()) / _temp.getMeasurementFrequency();
+    if(max_count == 1){
+        printf("Breathing too slow\r\n");
+        return -2;
+    }
+    else if (abs(max_average - mean) < threshold || max_count == 0 || duration <= 0)
+    {
+        return -1; //discard the sample
+    }
+    else
+    {        
+        float resp_rate = (60 * (max_count - 1)) / duration;
+        return resp_rate;
+    }
 }
 
 void RespiratoryRate::get_resp_rate()
 {
-    
     printf("Resp Sensing\n\r");
     // if ((_cap.calc_joules() > SENSING_ENERGY && _cap.read_voltage() > MIN_VOLTAGE))
     {
@@ -82,12 +86,6 @@ void RespiratoryRate::get_resp_rate()
         ThisThread::sleep_for(1000ms);
 
         _temp.initialize();
-
-        //int total_windows = 1;
-        //int breath_count = 0;
-        
-        //for (int window = 0; window < total_windows; window++)
-        //{
         const int SAMPLE_SIZE = 150;
 
         float samples[SAMPLE_SIZE] = {};
@@ -95,7 +93,6 @@ void RespiratoryRate::get_resp_rate()
 
         for (int i = 0; i < SAMPLE_SIZE;)
         {
-            
             _temp.update();
             while (!_temp.getBufferFull())
                 _temp.update();
@@ -115,10 +112,13 @@ void RespiratoryRate::get_resp_rate()
         float mean = (sum) / SAMPLE_SIZE;
         //printf("Mean %f\r\n", mean);
         float resp_rate = calc_resp_rate(samples, SAMPLE_SIZE, mean);
-        //}
-
+        if(resp_rate != -1){
+            printf("RR %0.2f bpm\r\n", resp_rate);
+        }
+        else{
+            printf("Sample discarded... Wait for the new reading\r\n");
+        }
         
-        printf("RR %f bpm\r\n", resp_rate);
         //respiratory_rate_buffer.push_back(new_rate);
     }
 }

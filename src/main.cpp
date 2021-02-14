@@ -33,7 +33,7 @@ void resp_rate()
     while(1)
     {
         rr.get_resp_rate();
-        ThisThread::sleep_for(10s);
+        ThisThread::sleep_for(5s);
     }
 }
 
