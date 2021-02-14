@@ -304,6 +304,19 @@ bool FaceBitState::_sync_data()
 
     for (int i = 0; i < data_buffer.size(); i++)
     {
+        ble_timeout.reset();
+        ble_timeout.start();
+        while(_smart_ppe_ble.getDataReady() != _smart_ppe_ble.NO_DATA)
+        {
+            if (ble_timeout.read_ms() > BLE_DRDY_TIMEOUT)
+            {
+                LOG_INFO("%s", "BLE DATA READY TIMEOUT");
+                ble_process.stop(); 
+                _ble_thread.terminate();
+                return false;
+            }
+        }
+
         FaceBitData next_data_point = data_buffer.at(i);
 
         switch(next_data_point.data_type)
