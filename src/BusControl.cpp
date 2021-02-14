@@ -54,6 +54,9 @@ void BusControl::init(void)
         power_lock.magnetometer = false;
         power_lock.barometer = false;
         power_lock.imu = false;
+
+        _spi_power = false;
+        _i2c_power = false;
     }
 
     _initialized = true;

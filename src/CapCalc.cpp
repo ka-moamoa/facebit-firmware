@@ -2,6 +2,9 @@
 #include "nrfx_saadc.h"
 #include "PinNames.h"
 
+CapCalc* CapCalc::_instance = nullptr; 
+Mutex CapCalc::_mutex; 
+
 CapCalc::CapCalc() :
 _cap_voltage_en(VCAP_ENABLE),
 _cap_voltage(VCAP)

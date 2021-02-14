@@ -74,7 +74,7 @@ private:
 	uint8_t _address;
 	I2C *_i2c;
 	std::vector<uint16_t> _tempx100_array;
-	uint8_t _measurement_frequency_hz = 10; // Hz
+	uint8_t _measurement_frequency_hz = 20; // Hz
 	LowPowerTimer _frequency_timer;
 	LowPowerTimer _timer;
 	uint64_t _relative_measurement_timestamp = 0;
@@ -96,7 +96,7 @@ private:
 	
 	const uint8_t MEASUREMENT_TIMEOUT_MS = 20; 
 
-	const uint8_t MAX_BUFFER_SIZE = 50;
+	const uint8_t MAX_BUFFER_SIZE = 100;
 };
 
 #endif
