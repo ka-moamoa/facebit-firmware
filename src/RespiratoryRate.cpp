@@ -1,8 +1,8 @@
 #include "RespiratoryRate.hpp"
 
-RespiratoryRate::RespiratoryRate(CapCalc &cap, Si7051 &temp) : _cap(cap),
-                                                               _temp(temp)
+RespiratoryRate::RespiratoryRate(CapCalc *cap, Si7051 &temp) : _temp(temp)
 {
+    _cap = cap;
     _bus_control = BusControl::get_instance();
 }
 
@@ -68,7 +68,7 @@ RespiratoryRate::RR_d RespiratoryRate::calc_resp_rate(float samples[], int SAMPL
 void RespiratoryRate::get_resp_rate()
 {
     printf("Resp Sensing\n\r");
-    // if ((_cap.calc_joules() > SENSING_ENERGY && _cap.read_voltage() > MIN_VOLTAGE))
+    // if ((_cap->calc_joules() > SENSING_ENERGY && _cap.read_voltage() > MIN_VOLTAGE))
     {
         _bus_control->i2c_power(true);
         ThisThread::sleep_for(1000ms);

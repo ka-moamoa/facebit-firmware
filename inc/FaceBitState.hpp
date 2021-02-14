@@ -41,16 +41,15 @@ public:
     };
 
     void run();
-    void update_state();
+    void update_state(uint32_t ts);
 private:
     SPI _spi;
     I2C _i2c;
     BusControl *_bus_control;
 
-    SmartPPEService _smart_ppe_ble;
     static events::EventQueue ble_queue;
-    static Thread _ble_thread;
-    static BLE &ble;    
+    // static SmartPPEService _smart_ppe_ble;
+    bool _force_update;
 
     DigitalIn _imu_cs;
     InterruptIn _imu_int1;
@@ -82,19 +81,20 @@ private:
     milliseconds ON_FACE_SLEEP_DURATION = 1000ms;
 
     const uint32_t RR_PERIOD = 5 * 60 * 1000; // 5 min
-    const uint32_t HR_PERIOD = 5000;//1 * 60 * 1000; // 1 min
+    const uint32_t HR_PERIOD = 10000;//1 * 60 * 1000; // 1 min
     const uint32_t MASK_FIT_PERIOD = 5000;//1 * 60 * 1000; // 1 min
-    const uint32_t BLE_BROADCAST_PERIOD = 30000;//5 * 60 * 1000; // 5 min
+    const uint32_t BLE_BROADCAST_PERIOD = 20000;//5 * 60 * 1000; // 5 min
     const uint32_t BLE_CONNECTION_TIMEOUT = 5000;
     const uint32_t BLE_DRDY_TIMEOUT = 1000;
+
+    uint32_t ACTIVE_STATE_ENTRY_TS = 0;
+
+    uint64_t _mask_state_change_ts = 0; 
 
     uint32_t _last_rr_ts = 0;
     uint32_t _last_hr_ts = 0;
     uint32_t _last_mf_ts = 0;
     uint32_t _last_ble_ts = 0;
-
-    LowPowerTimer _mask_state_timer; // gets reset and started whenever mask state changes
-    LowPowerTimer _task_state_timer; // gets reset and started when MASK_ON is entered
 
     void _imu_int_handler();
     bool _get_imu_int();

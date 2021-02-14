@@ -12,7 +12,7 @@ class SmartPPEService : ble::GattServer::EventHandler {
     const char* DATA_READY_UUID = "0F1F34A3-4567-484C-ACA2-CC8F662E8783";
     const char* RESPIRATORY_RATE_UUID = "0F1F34A3-4567-484C-ACA2-CC8F662E8784";
     const char* BCG_UUID = "0F1F34A3-4567-484C-ACA2-CC8F662E8785";
-    const char* FIT_UUID = "0F1F34A3-4567-484C-ACA2-CC8F662E8786";
+    const char* ON_UUID = "0F1F34A3-4567-484C-ACA2-CC8F662E8786";
     const char* TIME_UUID = "0F1F34A3-4567-484C-ACA2-CC8F662E8787";
 
 public:
@@ -22,7 +22,7 @@ public:
         TEMPERATURE = 2,
         ACCELEROMETER = 3,
         RESPIRATORY_RATE = 4,
-        MASK_FIT = 5,
+        MASK_ON = 5,
         COUGH_SAMPLE = 6,
         HEART_RATE = 7,
         NO_DATA = 8
@@ -34,7 +34,7 @@ public:
         const UUID temp_uuid(TEMPERATURE_UUID);
         const UUID rr_uuid(RESPIRATORY_RATE_UUID);
         const UUID bcg_uuid(BCG_UUID);
-        const UUID fit_uuid(FIT_UUID);
+        const UUID on_uuid(ON_UUID);
         const UUID data_ready_uuid(DATA_READY_UUID);
         const UUID time_uuid(TIME_UUID);
 
@@ -58,8 +58,8 @@ public:
             printf("Allocation of imu characteristic failed\r\n");
         }
 
-        _fit = new ReadOnlyArrayGattCharacteristic<uint8_t, 9> (fit_uuid, &_initial_value_uint8_t);
-        if (!_fit) {
+        _mask_on = new ReadOnlyArrayGattCharacteristic<uint8_t, 9> (on_uuid, &_initial_value_uint8_t);
+        if (!_mask_on) {
             printf("Allocation of mic characteristic failed\r\n");
         }
 
@@ -86,7 +86,7 @@ public:
             _temperature,
             _respiratory_rate,
             _bcg,
-            _fit,
+            _mask_on,
             _data_ready,
             _time};
 
@@ -175,6 +175,16 @@ public:
         _server->write(_bcg->getValueHandle(), bytearray, 9);
     }
 
+    void updateMaskOn(uint64_t data_timestamp, uint8_t mask_on)
+    {
+        uint8_t bytearray[9] = {0};
+        uint64_t timestamp = data_timestamp;
+        std::memcpy(bytearray, &timestamp, 8);
+
+        uint8_t on = mask_on;
+        std::memcpy(&bytearray[8], &on, 1);
+    }
+
     void updateDataReady(data_ready_t type)
     {
         uint8_t tmp = (uint8_t)type;
@@ -219,7 +229,7 @@ private:
     ReadOnlyArrayGattCharacteristic<uint8_t, 213>* _temperature = nullptr;
     ReadOnlyArrayGattCharacteristic<uint8_t, 9>* _respiratory_rate = nullptr;
     ReadOnlyArrayGattCharacteristic<uint8_t, 9>* _bcg = nullptr;
-    ReadOnlyArrayGattCharacteristic<uint8_t, 9>* _fit = nullptr;
+    ReadOnlyArrayGattCharacteristic<uint8_t, 9>* _mask_on = nullptr;
     ReadWriteGattCharacteristic<uint8_t>* _data_ready = nullptr;
     ReadWriteGattCharacteristic<uint64_t>* _time = nullptr;
 

@@ -7,12 +7,12 @@
 #include "PinNames.h"
 #include "CapCalc.h"
 #include "MaskStateDetection.hpp"
+#include "RespiratoryRate.hpp"
 
 #include "gatt_server_process.h"
 
 events::EventQueue FaceBitState::ble_queue(16 * EVENTS_EVENT_SIZE);
-Thread FaceBitState::_ble_thread(osPriorityNormal, 4096);
-BLE& FaceBitState::ble(BLE::Instance());
+// SmartPPEService FaceBitState::_smart_ppe_ble;
 
 FaceBitState::FaceBitState() :
 _spi(SPI_MOSI, SPI_MISO, SPI_SCK),
@@ -31,27 +31,31 @@ FaceBitState::~FaceBitState()
 void FaceBitState::run()
 {
     _spi.frequency(8000000); // fast, to reduce transaction time
-    LowPowerTimer _ble_timer;
+    LowPowerTimer state_timer;
 
-    _ble_timer.start();
+    state_timer.start();
 
+    _force_update = true;
     _sync_data();
 
     while(1)
     {
-        update_state();
-        LOG_TRACE("sleeping for %lli", static_cast<long long int>(_sleep_duration.count()));
-        ThisThread::sleep_for(_sleep_duration);
+        uint32_t ts = state_timer.read_ms();
+
+        update_state(ts);
         
-        if (_ble_timer.read_ms() - _last_ble_ts > BLE_BROADCAST_PERIOD && data_buffer.size() > 0)
+        if (ts - _last_ble_ts > BLE_BROADCAST_PERIOD)
         {
             _sync_data();
-            _last_ble_ts = _ble_timer.read_ms();
+            _last_ble_ts = ts;
         }
+
+        LOG_TRACE("sleeping for %lli", static_cast<long long int>(_sleep_duration.count()));
+        ThisThread::sleep_for(_sleep_duration);
     }
 }
 
-void FaceBitState::update_state()
+void FaceBitState::update_state(uint32_t ts)
 {
     switch(_mask_state)
     {
@@ -98,6 +102,7 @@ void FaceBitState::update_state()
         {
             if (_new_mask_state)
             {
+                ACTIVE_STATE_ENTRY_TS = ts;
                 _sleep_duration = ACTIVE_SLEEP_DURATION;
             }
 
@@ -121,7 +126,7 @@ void FaceBitState::update_state()
                 LOG_WARNING("%s", "MASK DETECTION ERROR");
             }
 
-            if(_mask_state_timer.read_ms() > ACTIVE_STATE_TIMEOUT)
+            if(ts - ACTIVE_STATE_ENTRY_TS > ACTIVE_STATE_TIMEOUT)
             {
                 _next_mask_state = OFF_FACE_INACTIVE;
                 _next_task_state = IDLE;
@@ -138,12 +143,10 @@ void FaceBitState::update_state()
             {
                 case IDLE:
                 {
-                    uint32_t ts = _mask_state_timer.read_ms();
-
-                    // if (ts - _last_rr_ts >= RR_PERIOD)
-                    // {
-                    //     _next_task_state = MEASURE_RESPIRATION_RATE;
-                    // }
+                    if (ts - _last_rr_ts >= RR_PERIOD)
+                    {
+                        _next_task_state = MEASURE_RESPIRATION_RATE;
+                    }
                     if (ts - _last_hr_ts >= HR_PERIOD)
                     {
                         _next_task_state = MEASURE_HEART_RATE;
@@ -162,27 +165,30 @@ void FaceBitState::update_state()
 
                 case MEASURE_RESPIRATION_RATE:
                 {
-                    
+                    CapCalc* cap = CapCalc::get_instance();
+                    Si7051 temp(&_i2c);
+                    RespiratoryRate rr(cap, temp);
+
+                    rr.get_resp_rate();
                     break;
                 }
 
                 case MEASURE_HEART_RATE:
                 {
                     LOG_INFO("%s", "MEASURING HR")
-                    // _last_hr_ts = _mask_state_timer.read_ms();
-                    // BCG bcg(&_spi, (PinName)IMU_INT1, (PinName)IMU_CS);
-                    // if(bcg.bcg(10s)) // blocking
-                    if (1)
+                    _last_hr_ts = ts;
+                    BCG bcg(&_spi, (PinName)IMU_INT1, (PinName)IMU_CS);
+
+                    if(bcg.bcg(10s)) // blocking
                     {
-                        // for(int i = 0; i < bcg.get_buffer_size(); i++)
-                        if (1)
+                        for(int i = 0; i < bcg.get_buffer_size(); i++)
                         {
                             FaceBitData hr_data;
-                            // BCG::HR_t hr = bcg.get_buffer_element();
+                            BCG::HR_t hr = bcg.get_buffer_element();
 
-                            // hr_data.data_type = HEART_RATE;
-                            // hr_data.timestamp = hr.timestamp;
-                            // hr_data.value = hr.rate;
+                            hr_data.data_type = HEART_RATE;
+                            hr_data.timestamp = hr.timestamp;
+                            hr_data.value = hr.rate;
 
                             hr_data.data_type = HEART_RATE;
                             hr_data.timestamp = time(NULL);
@@ -255,14 +261,15 @@ void FaceBitState::update_state()
 
     if (_mask_state != _next_mask_state)
     {
+        _force_update = true;
+
+        _mask_state_change_ts = time(NULL);
+
         _new_mask_state = true;
         _mask_state = _next_mask_state;
         LOG_INFO("MASK STATE: %i", _mask_state);
 
-        _mask_state_timer.reset();
-        _mask_state_timer.start();
-
-        _sleep_duration = 1ms;
+        _sleep_duration = 10ms;
     }
     else
     {
@@ -285,37 +292,64 @@ bool FaceBitState::_get_imu_int()
 
 bool FaceBitState::_sync_data()
 {    
-    LOG_TRACE("%s", "BLE BROADCAST");
+    LOG_INFO("%s", "BLE BROADCAST");
+
+    if (data_buffer.size() == 0 && _force_update == false)
+    {
+        return false;
+    }
+
+    BLE &ble = BLE::Instance();
 
     GattServerProcess ble_process(ble_queue, ble);
 
+    SmartPPEService _smart_ppe_ble;
     ble_process.on_init(callback(&_smart_ppe_ble, &SmartPPEService::start));
 
+    Thread _ble_thread(osPriorityNormal, 2048);
     _ble_thread.start(callback(&ble_process, &GattServerProcess::start));
 
     // wait for connection
-
     LowPowerTimer ble_timeout;
     ble_timeout.start();
     while(!ble_process.is_connected())
     {
+        Thread::State state = _ble_thread.get_state();
+        uint16_t size = ble_process.event_queue_size;
+        LOG_INFO("Thread state = %u, equeue size = %u", state, size);
+        
         if (ble_timeout.read_ms() > BLE_CONNECTION_TIMEOUT)
         {
             LOG_INFO("%s", "TIMEOUT BEFORE BLE CONNECTION");
             ble_process.stop(); 
             _ble_thread.terminate();
+            ble_queue.break_dispatch();
             return false;
         }
 
         ThisThread::sleep_for(250ms);
     }
 
-    ThisThread::sleep_for(100ms); // time enough for the phone to sync the time
+    // set mask on characteristic based on state
+    _smart_ppe_ble.updateMaskOn(_mask_state_change_ts, _mask_state);
+    _smart_ppe_ble.updateDataReady(_smart_ppe_ble.MASK_ON);
+
+    while(_smart_ppe_ble.getDataReady() != _smart_ppe_ble.NO_DATA)
+    {
+        if (ble_timeout.read_ms() > BLE_DRDY_TIMEOUT)
+        {
+            LOG_INFO("%s", "BLE DATA READY TIMEOUT (MASK ON)");
+            ble_process.stop(); 
+            _ble_thread.terminate();
+            ble_queue.break_dispatch();
+            return false;
+        }
+    }
 
     // sync timestamp
     _smart_ppe_ble.updateTime(time(NULL));
     set_time(_smart_ppe_ble.getTime());
-
+    LOG_INFO("Time set to %lli", time(NULL));
 
     for (int i = 0; i < data_buffer.size(); i++)
     {
@@ -325,9 +359,10 @@ bool FaceBitState::_sync_data()
         {
             if (ble_timeout.read_ms() > BLE_DRDY_TIMEOUT)
             {
-                LOG_INFO("%s", "BLE DATA READY TIMEOUT");
+                LOG_INFO("%s", "BLE DATA READY TIMEOUT (DATA)");
                 ble_process.stop(); 
                 _ble_thread.terminate();
+                ble_queue.break_dispatch();
                 return false;
             }
         }
@@ -352,8 +387,14 @@ bool FaceBitState::_sync_data()
         }
     }
 
+    if (data_buffer.size())
+    {
+        data_buffer.clear();
+    }
+
     ble_process.stop(); 
     _ble_thread.terminate();
+    ble_queue.break_dispatch();
 
     return true;
 }

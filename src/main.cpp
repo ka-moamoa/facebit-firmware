@@ -9,6 +9,9 @@
 #include "CapCalc.h"
 #include "FaceBitState.hpp"
 
+
+// #include "mbed_mem_trace.h"
+
 FaceBitState facebit;
 
 SWO_Channel swo("channel");
@@ -24,6 +27,7 @@ void blink()
 
 int main()
 {
+    // mbed_mem_trace_set_callback(mbed_mem_trace_default_callback);
     swo.claim();
 
     LOG_INFO("%s", "PROGRAM STARTING");
