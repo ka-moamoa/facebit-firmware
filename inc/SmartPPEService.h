@@ -63,11 +63,7 @@ public:
             printf("Allocation of mic characteristic failed\r\n");
         }
 
-<<<<<<< HEAD
-        _data_ready = new ReadOnlyGattCharacteristic<uint8_t> (data_ready_uuid, &_initial_value_uint8_t, GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_NOTIFY);
-=======
         _data_ready = new ReadWriteGattCharacteristic<uint8_t> (data_ready_uuid, &_initial_value_data_ready, GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_NOTIFY);
->>>>>>> data-collection
         if (!_data_ready) {
             printf("Allocation of data quality characteristic failed\r\n");
         }
@@ -102,7 +98,7 @@ public:
 
         _server->setEventHandler(this);
 
-        printf("Example service added with UUID 6243fabc-23e9-4b79-bd30-1dc57b8005d6\r\n");
+        printf("FaceBit service added with UUID 6243fabc-23e9-4b79-bd30-1dc57b8005d6\r\n");
     }
 
     void updatePressure(uint64_t data_timestamp, uint32_t measurement_frequencyx100, uint16_t *pressure_array, uint8_t size)

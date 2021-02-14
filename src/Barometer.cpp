@@ -57,7 +57,7 @@ bool Barometer::initialize()
 
     _int_pin.rise(callback(this, &Barometer::bar_data_ready));
 
-    LOG_DEBUG("%s", "Barometer initialized successfully");
+    LOG_TRACE("%s", "Barometer initialized successfully");
     _t_barometer.start();
     _initialized = true;
     return true;

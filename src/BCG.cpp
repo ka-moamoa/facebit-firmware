@@ -29,9 +29,6 @@ bool BCG::bcg(const seconds num_seconds)
     // turn on SPI bus
     _bus_control->spi_power(true);
 
-    // speed up bus to reduce transaction time
-    _spi->frequency(8000000);
-
     /**
      * @brief Init 4th order bandpass (10-13 Hz) Butterworth filters
      * 
@@ -66,8 +63,6 @@ bool BCG::bcg(const seconds num_seconds)
     BiQuadChain hr_isolation;
     BiQuad bq5( 2.58488e-03, -5.16976e-03, 2.58488e-03, -1.88131e+00, 8.98067e-01 );
     BiQuad bq6( 1.00000e+00, 2.00000e+00, 1.00000e+00, -1.95665e+00, 9.59238e-01 );
-
-    hr_isolation.add( &bq5 ).add( &bq6 );
 
     // Give time for the chip to turn on
     ThisThread::sleep_for(10ms);
@@ -183,8 +178,6 @@ bool BCG::bcg(const seconds num_seconds)
     }
 
     _bus_control->spi_power(false);
-
-    float collection_time = zc_timer.read();
     zc_timer.stop();
 
     return new_hr_reading;

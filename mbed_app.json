@@ -3,7 +3,9 @@
         "SMARTPPE": {
             "target.features_add": ["BLE"],
             "target.printf_lib": "std",
-            "events.use-lowpower-timer-ticker": true
+            "events.use-lowpower-timer-ticker": true,
+            "platform.memory-tracing-enabled": false,
+            "rtos.main-thread-stack-size": 4096
         }
     }
 }
