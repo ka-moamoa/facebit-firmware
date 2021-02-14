@@ -372,12 +372,12 @@ bool FaceBitState::_sync_data()
         switch(next_data_point.data_type)
         {
             case HEART_RATE:
-                _smart_ppe_ble.updateRespiratoryRate(next_data_point.timestamp, next_data_point.value);
+                _smart_ppe_ble.updateHeartRate(next_data_point.timestamp, next_data_point.value);
                 _smart_ppe_ble.updateDataReady(_smart_ppe_ble.HEART_RATE);
                 break;
             
             case RESPIRATORY_RATE:
-                _smart_ppe_ble.updateHeartRate(next_data_point.timestamp, next_data_point.value);
+                _smart_ppe_ble.updateRespiratoryRate(next_data_point.timestamp, next_data_point.value);
                 _smart_ppe_ble.updateDataReady(_smart_ppe_ble.RESPIRATORY_RATE);
                 break;
 
