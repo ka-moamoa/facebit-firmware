@@ -316,14 +316,14 @@ bool FaceBitState::_sync_data()
     {
         Thread::State state = _ble_thread.get_state();
         uint16_t size = ble_process.event_queue_size;
-        LOG_INFO("Thread state = %u, equeue size = %u", state, size);
+        LOG_TRACE("Thread state = %u, equeue size = %u", state, size);
         
         if (ble_timeout.read_ms() > BLE_CONNECTION_TIMEOUT)
         {
             LOG_INFO("%s", "TIMEOUT BEFORE BLE CONNECTION");
             ble_process.stop(); 
             _ble_thread.terminate();
-            ble_queue.break_dispatch();
+            // ble_queue.break_dispatch();
             return false;
         }
 
