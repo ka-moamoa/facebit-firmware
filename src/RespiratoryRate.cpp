@@ -19,7 +19,7 @@ float RespiratoryRate::calc_resp_rate(float samples[], int SAMPLE_SIZE, float me
     float delta = 0.5;
     int first_peak;
     int last_peak;
-    float threshold = 0.1;
+    float threshold = 0.05;
     vector<int> peak_indices;
     while (i < SAMPLE_SIZE)
     {
