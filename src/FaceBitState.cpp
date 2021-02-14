@@ -12,7 +12,7 @@
 #include "gatt_server_process.h"
 
 events::EventQueue FaceBitState::ble_queue(16 * EVENTS_EVENT_SIZE);
-// SmartPPEService FaceBitState::_smart_ppe_ble;
+SmartPPEService FaceBitState::_smart_ppe_ble;
 
 FaceBitState::FaceBitState() :
 _spi(SPI_MOSI, SPI_MISO, SPI_SCK),
@@ -303,7 +303,6 @@ bool FaceBitState::_sync_data()
 
     GattServerProcess ble_process(ble_queue, ble);
 
-    SmartPPEService _smart_ppe_ble;
     ble_process.on_init(callback(&_smart_ppe_ble, &SmartPPEService::start));
 
     Thread _ble_thread(osPriorityNormal, 2048);
@@ -330,9 +329,19 @@ bool FaceBitState::_sync_data()
         ThisThread::sleep_for(250ms);
     }
 
+    ThisThread::sleep_for(5s);
+
     // set mask on characteristic based on state
     _smart_ppe_ble.updateMaskOn(_mask_state_change_ts, _mask_state);
     _smart_ppe_ble.updateDataReady(_smart_ppe_ble.MASK_ON);
+
+    // sync timestamp
+    _smart_ppe_ble.updateTime(time(NULL));
+    set_time(_smart_ppe_ble.getTime());
+    LOG_INFO("Time set to %lli", time(NULL));
+
+    ble_timeout.reset();
+    ble_timeout.start();
 
     while(_smart_ppe_ble.getDataReady() != _smart_ppe_ble.NO_DATA)
     {
@@ -345,11 +354,6 @@ bool FaceBitState::_sync_data()
             return false;
         }
     }
-
-    // sync timestamp
-    _smart_ppe_ble.updateTime(time(NULL));
-    set_time(_smart_ppe_ble.getTime());
-    LOG_INFO("Time set to %lli", time(NULL));
 
     for (int i = 0; i < data_buffer.size(); i++)
     {
