@@ -20,7 +20,7 @@ public:
     RR_t get_buffer_element();
     uint8_t get_buffer_size() { return respiratory_rate_buffer.size(); };
 
-    void get_resp_rate();
+    bool get_resp_rate();
     
 private:
     CapCalc *_cap;

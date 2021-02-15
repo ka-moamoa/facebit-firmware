@@ -85,8 +85,10 @@ float RespiratoryRate::calc_resp_rate(float samples[], int SAMPLE_SIZE, float me
     }
 }
 
-void RespiratoryRate::get_resp_rate()
+bool RespiratoryRate::get_resp_rate()
 {
+    bool new_resp_rate = false;
+
     printf("Resp Sensing\n\r");
     // if ((_cap->calc_joules() > SENSING_ENERGY && _cap.read_voltage() > MIN_VOLTAGE))
     {
@@ -127,10 +129,18 @@ void RespiratoryRate::get_resp_rate()
             printf("Sample discarded... Wait for the new reading\r\n");
         }
 
-        RR_t new_rate;
-        new_rate.rate = resp_rate;
-        new_rate.timestamp = time(NULL);
+        if (resp_rate > 4 && resp_rate < 35)
+        {
+            new_resp_rate = true;
+            
+            RR_t new_rate;
+            new_rate.rate = resp_rate;
+            new_rate.timestamp = time(NULL);
+
+            respiratory_rate_buffer.push_back(new_rate);
+        }
         
-        respiratory_rate_buffer.push_back(new_rate);
     }
+
+    return new_resp_rate;
 }

@@ -19,7 +19,7 @@ BCG::~BCG()
 
 BCG::HR_t BCG::get_buffer_element()
 {
-    HR_t tmp = _HR.at(0);
+    HR_t tmp = _HR.front();
     _HR.erase(_HR.begin());
     return tmp;
 }
@@ -178,7 +178,7 @@ bool BCG::bcg(const seconds num_seconds)
     }
 
     _bus_control->spi_power(false);
-    zc_timer.stop();
+    zc_timer.stop(); 
 
     return new_hr_reading;
 }
@@ -362,3 +362,13 @@ double BCG::_l2norm(double x, double y, double z)
 
     // float HR = HR_sum / descending_zc_timestamps.size();
     // LOG_INFO("HR = %0.1f", HR);
+
+    //     float sum = 0;
+    // uint8_t size = _HR.size();
+    // for (int i = 0; i < size; i++)
+    // {
+    //     sum += _HR.front();
+    //     _HR.erase(_HR.begin());
+    // }
+
+    // float mean = sum / (float)size;  

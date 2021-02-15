@@ -12,8 +12,7 @@
 
 
 events::EventQueue FaceBitState::ble_queue(16 * EVENTS_EVENT_SIZE);
-Thread FaceBitState::_ble_thread(osPriorityNormal, 2048);
-
+Thread FaceBitState::_ble_thread(osPriorityNormal, 4096);
 
 FaceBitState::FaceBitState(SmartPPEService *smart_ppe_ble, bool *imu_interrupt) :
 _spi(SPI_MOSI, SPI_MISO, SPI_SCK),
@@ -78,7 +77,7 @@ void FaceBitState::update_state(uint32_t ts)
 
                 imu.enable_x();
                 imu.enable_wake_up_detection(_wakeup_int_pin);
-                imu.set_wake_up_threshold(LSM6DSL_WAKE_UP_THRESHOLD_LOW);
+                imu.set_wake_up_threshold(LSM6DSL_WAKE_UP_THRESHOLD_MID_LOW);
 
                 _bus_control->set_power_lock(BusControl::IMU, true);
                 _bus_control->spi_power(false);
@@ -158,14 +157,6 @@ void FaceBitState::update_state(uint32_t ts)
                     {
                         _next_task_state = MEASURE_HEART_RATE;
                     }
-                    // else if(ts - _last_mf_ts > MASK_FIT_PERIOD)
-                    // {
-                    //     _next_task_state = MEASURE_MASK_FIT;
-                    // }
-                    // else if (ts - _last_ble_ts > BLE_BROADCAST_PERIOD)
-                    // {
-                    //     _next_task_state = BLE_BROADCAST;
-                    // }
 
                     break;
                 }
@@ -178,21 +169,22 @@ void FaceBitState::update_state(uint32_t ts)
 
                     _last_rr_ts = ts;
 
-                    resp_rate.get_resp_rate();
-
-                    RespiratoryRate::RR_t rr;
-
-                    if (resp_rate.get_buffer_size())
+                    if(resp_rate.get_resp_rate())
                     {
-                        rr = resp_rate.get_buffer_element();
+                        RespiratoryRate::RR_t rr;
+                        if (resp_rate.get_buffer_size())
+                        {
+                            rr = resp_rate.get_buffer_element();
+                        }
+
+                        FaceBitData rr_data;
+                        rr_data.data_type = RESPIRATORY_RATE;
+                        rr_data.timestamp = rr.timestamp;
+                        rr_data.value = rr.rate;
+
+                        data_buffer.push_back(rr_data);
+
                     }
-
-                    FaceBitData rr_data;
-                    rr_data.data_type = RESPIRATORY_RATE;
-                    rr_data.timestamp = rr.timestamp;
-                    rr_data.value = rr.rate;
-
-                    data_buffer.push_back(rr_data);
 
                     _next_task_state = IDLE;
 
@@ -216,20 +208,10 @@ void FaceBitState::update_state(uint32_t ts)
                             hr_data.timestamp = hr.timestamp;
                             hr_data.value = hr.rate;
 
-                            // hr_data.data_type = HEART_RATE;
-                            // hr_data.timestamp = time(NULL);
-                            // hr_data.value = 3;
-
                             data_buffer.push_back(hr_data);
                         }
                     }
                     _next_task_state = IDLE;
-                    break;
-                }
-
-                case MEASURE_MASK_FIT:
-                {
-                    
                     break;
                 }
 
