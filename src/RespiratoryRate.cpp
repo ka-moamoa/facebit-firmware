@@ -126,7 +126,11 @@ void RespiratoryRate::get_resp_rate()
         else{
             printf("Sample discarded... Wait for the new reading\r\n");
         }
+
+        RR_t new_rate;
+        new_rate.rate = resp_rate;
+        new_rate.timestamp = time(NULL);
         
-        //respiratory_rate_buffer.push_back(new_rate);
+        respiratory_rate_buffer.push_back(new_rate);
     }
 }

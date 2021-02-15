@@ -78,7 +78,7 @@ void FaceBitState::update_state(uint32_t ts)
 
                 imu.enable_x();
                 imu.enable_wake_up_detection(_wakeup_int_pin);
-                imu.set_wake_up_threshold(LSM6DSL_WAKE_UP_THRESHOLD_MID);
+                imu.set_wake_up_threshold(LSM6DSL_WAKE_UP_THRESHOLD_LOW);
 
                 _bus_control->set_power_lock(BusControl::IMU, true);
                 _bus_control->spi_power(false);
@@ -176,6 +176,8 @@ void FaceBitState::update_state(uint32_t ts)
                     Si7051 temp(&_i2c);
                     RespiratoryRate resp_rate(cap, temp);
 
+                    _last_rr_ts = ts;
+
                     resp_rate.get_resp_rate();
 
                     RespiratoryRate::RR_t rr;
@@ -203,7 +205,7 @@ void FaceBitState::update_state(uint32_t ts)
                     _last_hr_ts = ts;
                     BCG bcg(&_spi, (PinName)IMU_INT1, (PinName)IMU_CS);
 
-                    if(bcg.bcg(10s)) // blocking
+                    if(bcg.bcg(15s)) // blocking
                     {
                         for(int i = 0; i < bcg.get_buffer_size(); i++)
                         {
