@@ -179,7 +179,11 @@ void FaceBitState::update_state(uint32_t ts)
                     resp_rate.get_resp_rate();
 
                     RespiratoryRate::RR_t rr;
-                    rr = resp_rate.get_buffer_element();
+
+                    if (resp_rate.get_buffer_size())
+                    {
+                        rr = resp_rate.get_buffer_element();
+                    }
 
                     FaceBitData rr_data;
                     rr_data.data_type = RESPIRATORY_RATE;
@@ -187,6 +191,8 @@ void FaceBitState::update_state(uint32_t ts)
                     rr_data.value = rr.rate;
 
                     data_buffer.push_back(rr_data);
+
+                    _next_task_state = IDLE;
 
                     break;
                 }
@@ -375,17 +381,7 @@ bool FaceBitState::_sync_data(GattServerProcess *_ble_process)
 
     for (int i = 0; i < data_buffer.size(); i++)
     {
-        ble_timeout.reset();
-        ble_timeout.start();
-        while(_smart_ppe_ble->getDataReady() != _smart_ppe_ble->NO_DATA)
-        {
-            if (ble_timeout.read_ms() > BLE_DRDY_TIMEOUT)
-            {
-                LOG_INFO("%s", "BLE DATA READY TIMEOUT (DATA)");
-                _ble_thread.flags_set(STOP_BLE);
-                return false;
-            }
-        }
+        LOG_DEBUG("DATA BUFFER HAS %u ELEMENTS", data_buffer.size());
 
         FaceBitData next_data_point = data_buffer.at(i);
 
@@ -401,6 +397,19 @@ bool FaceBitState::_sync_data(GattServerProcess *_ble_process)
                 LOG_DEBUG("WRITING RESP RATE = %u", next_data_point.value);
                 _smart_ppe_ble->updateRespiratoryRate(next_data_point.timestamp, next_data_point.value);
                 _smart_ppe_ble->updateDataReady(_smart_ppe_ble->RESPIRATORY_RATE);
+                ble_timeout.reset();
+                ble_timeout.start();
+                while(_smart_ppe_ble->getDataReady() != _smart_ppe_ble->NO_DATA)
+                {
+                    _smart_ppe_ble->updateDataReady(_smart_ppe_ble->RESPIRATORY_RATE);
+                    if (ble_timeout.read_ms() > BLE_DRDY_TIMEOUT)
+                    {
+                        LOG_INFO("%s", "BLE DATA READY TIMEOUT (DATA)");
+                        _ble_thread.flags_set(STOP_BLE);
+                        return false;
+                    }
+                    ThisThread::sleep_for(100ms);
+                }
                 break;
 
             case MASK_FIT:

@@ -18,6 +18,7 @@ public:
     ~RespiratoryRate();
 
     RR_t get_buffer_element();
+    uint8_t get_buffer_size() { return respiratory_rate_buffer.size(); };
 
     void get_resp_rate();
     
