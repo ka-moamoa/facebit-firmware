@@ -149,11 +149,17 @@ void FaceBitState::update_state(uint32_t ts)
             {
                 case IDLE:
                 {
-                    if (ts - _last_rr_ts >= RR_PERIOD)
+                    int32_t rr_time_over = ts - _last_rr_ts;
+                    int32_t hr_time_over = ts - _last_hr_ts;
+
+                    if (rr_time_over < 0) rr_time_over = 0;
+                    if (hr_time_over < 0) hr_time_over = 0;
+
+                    if (ts - _last_rr_ts >= RR_PERIOD && (rr_time_over > hr_time_over))
                     {
                         _next_task_state = MEASURE_RESPIRATION_RATE;
                     }
-                    else if (ts - _last_hr_ts >= HR_PERIOD)
+                    else if (ts - _last_hr_ts >= HR_PERIOD && (hr_time_over > rr_time_over))
                     {
                         _next_task_state = MEASURE_HEART_RATE;
                     }
