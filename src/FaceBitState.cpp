@@ -174,9 +174,20 @@ void FaceBitState::update_state(uint32_t ts)
                 {
                     CapCalc* cap = CapCalc::get_instance();
                     Si7051 temp(&_i2c);
-                    RespiratoryRate rr(cap, temp);
+                    RespiratoryRate resp_rate(cap, temp);
 
-                    rr.get_resp_rate();
+                    resp_rate.get_resp_rate();
+
+                    RespiratoryRate::RR_t rr;
+                    rr = resp_rate.get_buffer_element();
+
+                    FaceBitData rr_data;
+                    rr_data.data_type = RESPIRATORY_RATE;
+                    rr_data.timestamp = rr.timestamp;
+                    rr_data.value = rr.rate;
+
+                    data_buffer.push_back(rr_data);
+
                     break;
                 }
 
@@ -197,9 +208,9 @@ void FaceBitState::update_state(uint32_t ts)
                             hr_data.timestamp = hr.timestamp;
                             hr_data.value = hr.rate;
 
-                            hr_data.data_type = HEART_RATE;
-                            hr_data.timestamp = time(NULL);
-                            hr_data.value = 3;
+                            // hr_data.data_type = HEART_RATE;
+                            // hr_data.timestamp = time(NULL);
+                            // hr_data.value = 3;
 
                             data_buffer.push_back(hr_data);
                         }
@@ -384,6 +395,8 @@ bool FaceBitState::_sync_data(GattServerProcess *_ble_process)
     {
         data_buffer.clear();
     }
+
+    _force_update = false;
 
     _ble_thread.flags_set(STOP_BLE);
 

@@ -30,15 +30,7 @@ void blink()
 
 void imu_int_handler()
 {
-<<<<<<< HEAD
     imu_interrupt = true;
-=======
-    while(1)
-    {
-        rr.get_resp_rate();
-        ThisThread::sleep_for(5s);
-    }
->>>>>>> resp-rate-application
 }
 
 Thread thread1(osPriorityNormal, 512);
