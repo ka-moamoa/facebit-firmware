@@ -336,19 +336,19 @@ bool FaceBitState::_sync_data(GattServerProcess *_ble_process)
 
     // set mask on characteristic based on state
     _smart_ppe_ble->updateMaskOn(_mask_state_change_ts, _mask_state);
+    _smart_ppe_ble->updateDataReady(SmartPPEService::MASK_ON);
 
     ble_timeout.reset();
     ble_timeout.start();
     while(1)
     { 
-        _smart_ppe_ble->updateDataReady(SmartPPEService::MASK_ON);
-
         SmartPPEService::data_ready_t data_ready =  _smart_ppe_ble->getDataReady();
-
         if (data_ready == SmartPPEService::NO_DATA)
         {
             break;
         }
+        
+        _smart_ppe_ble->updateDataReady(SmartPPEService::MASK_ON);
 
         if (ble_timeout.read_ms() > BLE_DRDY_TIMEOUT)
         {
