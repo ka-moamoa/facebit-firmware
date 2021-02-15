@@ -13,24 +13,24 @@ public:
         int rate;
         uint64_t timestamp;
     } RR_t;
-    
-    typedef struct
-    {
-        int breath_count;
-        uint64_t duration;
-    } RR_d;
 
+<<<<<<< HEAD
     RespiratoryRate(CapCalc *cap, Si7051 &temp);
     ~RespiratoryRate();
 
     RR_t get_buffer_element();
 
+=======
+
+    float calc_resp_rate(float samples[], int SAMPLE_SIZE, float mean);
+>>>>>>> resp-rate-application
     void get_resp_rate();
     
 private:
     CapCalc *_cap;
     Si7051 &_temp;
     BusControl *_bus_control;
+    LowPowerTimer _temp_timer;
 
     vector<RR_t> respiratory_rate_buffer;
 
