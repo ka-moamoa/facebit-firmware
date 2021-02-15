@@ -1,8 +1,8 @@
 #include "RespiratoryRate.hpp"
 
-RespiratoryRate::RespiratoryRate(CapCalc *cap, Si7051 &temp) : _temp(temp)
+RespiratoryRate::RespiratoryRate(CapCalc *cap, Si7051 &temp) : _cap(cap),
+                                                               _temp(temp)
 {
-    _cap = cap;
     _bus_control = BusControl::get_instance();
 }
 
