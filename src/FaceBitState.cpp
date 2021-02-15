@@ -341,8 +341,7 @@ bool FaceBitState::_sync_data(GattServerProcess *_ble_process)
     ble_timeout.start();
     while(1)
     { 
-        LOG_DEBUG("%s", "UPDATING DRDY");
-        _smart_ppe_ble->updateDataReady(SmartPPEService::PRESSURE);
+        _smart_ppe_ble->updateDataReady(SmartPPEService::MASK_ON);
 
         SmartPPEService::data_ready_t data_ready =  _smart_ppe_ble->getDataReady();
 
