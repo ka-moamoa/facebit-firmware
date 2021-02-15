@@ -47,8 +47,8 @@ private:
      * STD_DEV_THRESHOLD before we calculate 
      * a heart rate based on them.
      */
-    uint8_t NUM_EVENTS = 6; // number of sequential events
-    float STD_DEV_THRESHOLD = 4.5; // in BPM
+    uint8_t NUM_EVENTS = 5; // number of sequential events
+    float STD_DEV_THRESHOLD = 5.0; // in BPM
 
     uint8_t MIN_HR = 45; // BPM below this limit are filtered out during the HR_isolation stage
     uint8_t MAX_HR = 150; // BPM above this limit are filtered out during the HR_isolation stage

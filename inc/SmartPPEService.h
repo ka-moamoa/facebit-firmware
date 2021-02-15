@@ -183,6 +183,8 @@ public:
 
         uint8_t on = mask_on;
         std::memcpy(&bytearray[8], &on, 1);
+
+        _server->write(_mask_on->getValueHandle(), bytearray, 9);
     }
 
     void updateDataReady(data_ready_t type)

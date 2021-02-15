@@ -81,10 +81,11 @@ private:
     uint32_t ACTIVE_STATE_TIMEOUT = 60000;
     milliseconds ON_FACE_SLEEP_DURATION = 1000ms;
 
-    const uint32_t RR_PERIOD = 5 * 60 * 1000; // 5 min
+    const uint32_t RR_PERIOD = 1 * 60 * 1000; // 5 min
     const uint32_t HR_PERIOD = 10000;//1 * 60 * 1000; // 1 min
-    const uint32_t MASK_FIT_PERIOD = 5000;//1 * 60 * 1000; // 1 min
+    // const uint32_t MASK_FIT_PERIOD = 5000;//1 * 60 * 1000; // 1 min
     const uint32_t BLE_BROADCAST_PERIOD = 20000;//5 * 60 * 1000; // 5 min
+
     const uint32_t BLE_CONNECTION_TIMEOUT = 5000;
     const uint32_t BLE_DRDY_TIMEOUT = 5000;
 

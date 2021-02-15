@@ -154,7 +154,7 @@ void FaceBitState::update_state(uint32_t ts)
                     {
                         _next_task_state = MEASURE_RESPIRATION_RATE;
                     }
-                    if (ts - _last_hr_ts >= HR_PERIOD)
+                    else if (ts - _last_hr_ts >= HR_PERIOD)
                     {
                         _next_task_state = MEASURE_HEART_RATE;
                     }
@@ -322,14 +322,14 @@ bool FaceBitState::_sync_data(GattServerProcess *_ble_process)
         ThisThread::sleep_for(250ms);
     }
 
-    ThisThread::sleep_for(5s);
+    ThisThread::sleep_for(1s);
 
     // set mask on characteristic based on state
     _smart_ppe_ble->updateMaskOn(_mask_state_change_ts, _mask_state);
     _smart_ppe_ble->updateDataReady(_smart_ppe_ble->MASK_ON);
 
     // sync timestamp
-    _smart_ppe_ble->updateTime(time(NULL));
+    // _smart_ppe_ble->updateTime(time(NULL));
     set_time(_smart_ppe_ble->getTime());
     LOG_INFO("Time set to %lli", time(NULL));
 
