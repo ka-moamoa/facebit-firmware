@@ -304,12 +304,13 @@ bool FaceBitState::_get_imu_int()
 
 bool FaceBitState::_sync_data(GattServerProcess *_ble_process)
 {    
-    LOG_INFO("%s", "BLE BROADCAST");
-
     if (data_buffer.size() == 0 && _force_update == false)
     {
+        LOG_DEBUG("%s", "NO DATA TO SEND")
         return false;
     }
+
+    LOG_DEBUG("%s", "BLE SYNC");
 
     // start ble
     _ble_thread.flags_set(START_BLE);
@@ -340,12 +341,15 @@ bool FaceBitState::_sync_data(GattServerProcess *_ble_process)
 
     // sync timestamp
     // _smart_ppe_ble->updateTime(time(NULL));
-    set_time(_smart_ppe_ble->getTime());
-    LOG_INFO("Time set to %lli", time(NULL));
+    uint64_t new_time = _smart_ppe_ble->getTime();
+    if (new_time != 0)
+    {
+        set_time(_smart_ppe_ble->getTime());
+        LOG_INFO("Time set to %lli", time(NULL));
+    }
 
     ble_timeout.reset();
     ble_timeout.start();
-
     while(_smart_ppe_ble->getDataReady() != _smart_ppe_ble->NO_DATA)
     {
         _smart_ppe_ble->updateDataReady(_smart_ppe_ble->MASK_ON);
@@ -358,6 +362,11 @@ bool FaceBitState::_sync_data(GattServerProcess *_ble_process)
         }
 
         ThisThread::sleep_for(100ms);
+    }
+
+    if (data_buffer.size() == 0)
+    {
+        LOG_DEBUG("%s", "NO PHYSIO DATA TO SEND");
     }
 
     for (int i = 0; i < data_buffer.size(); i++)
@@ -379,11 +388,13 @@ bool FaceBitState::_sync_data(GattServerProcess *_ble_process)
         switch(next_data_point.data_type)
         {
             case HEART_RATE:
+                LOG_DEBUG("WRITING HR = %u", next_data_point.value);
                 _smart_ppe_ble->updateHeartRate(next_data_point.timestamp, next_data_point.value);
                 _smart_ppe_ble->updateDataReady(_smart_ppe_ble->HEART_RATE);
                 break;
             
             case RESPIRATORY_RATE:
+                LOG_DEBUG("WRITING RESP RATE = %u", next_data_point.value);
                 _smart_ppe_ble->updateRespiratoryRate(next_data_point.timestamp, next_data_point.value);
                 _smart_ppe_ble->updateDataReady(_smart_ppe_ble->RESPIRATORY_RATE);
                 break;
