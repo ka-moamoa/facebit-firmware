@@ -64,6 +64,8 @@ bool BCG::bcg(const seconds num_seconds)
     BiQuad bq5( 2.58488e-03, -5.16976e-03, 2.58488e-03, -1.88131e+00, 8.98067e-01 );
     BiQuad bq6( 1.00000e+00, 2.00000e+00, 1.00000e+00, -1.95665e+00, 9.59238e-01 );
 
+    hr_isolation.add( &bq5 ).add ( &bq6 );
+
     // Give time for the chip to turn on
     ThisThread::sleep_for(10ms);
 
@@ -87,6 +89,7 @@ bool BCG::bcg(const seconds num_seconds)
     LowPowerTimer zc_timer;
     zc_timer.start();
 
+    LOG_INFO("%s", "SENSING HR");
 
     // acquire and process samples until num_seconds has elapsed
     while(zc_timer.elapsed_time() <= duration_cast<microseconds>(num_seconds))
@@ -114,6 +117,7 @@ bool BCG::bcg(const seconds num_seconds)
 
             // send l2norm through hr isolation filter
             float next_bcg_val = hr_isolation.step(mag);
+            // LOG_INFO("bcg val = %0.2f", next_bcg_val);
             
             // look for a descending zero-cross
             if (last_bcg_val > 0 && next_bcg_val <= 0)
@@ -137,7 +141,8 @@ bool BCG::bcg(const seconds num_seconds)
                     Utilities::reciprocal(crosses_copy); // get element-wise frequency
                     Utilities::multiply(crosses_copy, 60.0); // get element-wise heart rate
                     float std_dev = Utilities::std_dev(crosses_copy); // calculate standard deviation across the heart rates
-                    
+                    // printf("%0.3f", std_dev);
+
                     if (std_dev < STD_DEV_THRESHOLD) // we have some stable readings! calculate heart rate
                     {
                         float rate_raw = Utilities::mean(crosses_copy);
@@ -152,7 +157,7 @@ bool BCG::bcg(const seconds num_seconds)
                             new_hr.rate = rate;
                             new_hr.timestamp = time(NULL);
 
-                            LOG_INFO("New HR reading --> rate: %0.1f, time: %lli", rate_raw, new_hr.timestamp);
+                            // LOG_INFO("New HR reading --> rate: %0.1f, time: %lli", rate_raw, new_hr.timestamp);
 
                             while (_HR.size() >= HR_BUFFER_SIZE)
                             {

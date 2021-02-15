@@ -199,6 +199,7 @@ void FaceBitState::update_state(uint32_t ts)
 
                     if(bcg.bcg(15s)) // blocking
                     {
+                        LOG_INFO("%s", "HR CAPTURED!");
                         for(int i = 0; i < bcg.get_buffer_size(); i++)
                         {
                             FaceBitData hr_data;
@@ -375,6 +376,20 @@ bool FaceBitState::_sync_data(GattServerProcess *_ble_process)
                 LOG_DEBUG("WRITING HR = %u", next_data_point.value);
                 _smart_ppe_ble->updateHeartRate(next_data_point.timestamp, next_data_point.value);
                 _smart_ppe_ble->updateDataReady(_smart_ppe_ble->HEART_RATE);
+                
+                ble_timeout.reset();
+                ble_timeout.start();
+                while(_smart_ppe_ble->getDataReady() != _smart_ppe_ble->NO_DATA)
+                {
+                    _smart_ppe_ble->updateDataReady(_smart_ppe_ble->HEART_RATE);
+                    if (ble_timeout.read_ms() > BLE_DRDY_TIMEOUT)
+                    {
+                        LOG_INFO("%s", "BLE DATA READY TIMEOUT (DATA)");
+                        _ble_thread.flags_set(STOP_BLE);
+                        return false;
+                    }
+                    ThisThread::sleep_for(100ms);
+                }
                 break;
             
             case RESPIRATORY_RATE:
