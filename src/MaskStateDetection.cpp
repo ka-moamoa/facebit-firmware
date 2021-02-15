@@ -12,7 +12,7 @@ MaskStateDetection::~MaskStateDetection()
 
 MaskStateDetection::MASK_STATE_t MaskStateDetection::is_on()
 {
-    LOG_INFO("%s", "CHECKING MASK STATE");
+    LOG_INFO("%s", "CHECKING MASK ON");
 
     BusControl* _bus_control = BusControl::get_instance();
     _bus_control->spi_power(true);

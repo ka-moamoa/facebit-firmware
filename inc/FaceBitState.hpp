@@ -6,6 +6,7 @@
 #include "BusControl.h"
 #include <vector>
 
+#include "gatt_server_process.h"
 #include "SmartPPEService.h"
 
 using namespace std::chrono;
@@ -13,7 +14,7 @@ using namespace std::chrono;
 class FaceBitState
 {
 public:
-    FaceBitState();
+    FaceBitState(SmartPPEService *smart_ppe_ble, bool *imu_interrupt);
     ~FaceBitState();
 
     enum MASK_STATE_t
@@ -47,16 +48,14 @@ private:
     I2C _i2c;
     BusControl *_bus_control;
 
-
-    static SmartPPEService _smart_ppe_ble;
+    SmartPPEService* _smart_ppe_ble;
+    static Thread _ble_thread;
     static events::EventQueue ble_queue;
-    // static SmartPPEService _smart_ppe_ble;
     bool _force_update;
 
     DigitalIn _imu_cs;
-    InterruptIn _imu_int1;
     LSM6DSL_Interrupt_Pin_t _wakeup_int_pin = LSM6DSL_INT1_PIN;
-    bool _imu_interrupt = false;
+    bool *_imu_interrupt;
 
     struct FaceBitData
     {
@@ -98,9 +97,10 @@ private:
     uint32_t _last_mf_ts = 0;
     uint32_t _last_ble_ts = 0;
 
-    void _imu_int_handler();
+    bool _ble_initialized = false;
+
     bool _get_imu_int();
-    bool _sync_data();
+    bool _sync_data(GattServerProcess *_ble_process);
 };
 
 

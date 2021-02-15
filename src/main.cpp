@@ -9,10 +9,13 @@
 #include "CapCalc.h"
 #include "FaceBitState.hpp"
 
-
 // #include "mbed_mem_trace.h"
 
-FaceBitState facebit;
+InterruptIn imu_int(IMU_INT1);
+bool imu_interrupt = false;
+
+SmartPPEService _smart_ppe_ble;
+FaceBitState facebit(&_smart_ppe_ble, &imu_interrupt);
 
 SWO_Channel swo("channel");
 
@@ -25,15 +28,22 @@ void blink()
     }
 }
 
+void imu_int_handler()
+{
+    imu_interrupt = true;
+}
+
+Thread thread1(osPriorityNormal, 512);
+
 int main(){
-    // mbed_mem_trace_set_callback(mbed_mem_trace_default_callback);
     swo.claim();
 
     LOG_INFO("%s", "PROGRAM STARTING");
+
+    imu_int.rise(imu_int_handler);
  
     BusControl::get_instance()->init();
 
-    Thread thread1(osPriorityNormal, 512);
     thread1.start(blink);
 
     facebit.run();

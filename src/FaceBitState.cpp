@@ -8,20 +8,21 @@
 #include "CapCalc.h"
 #include "MaskStateDetection.hpp"
 #include "RespiratoryRate.hpp"
+#include "ble_process.h"
 
-#include "gatt_server_process.h"
 
 events::EventQueue FaceBitState::ble_queue(16 * EVENTS_EVENT_SIZE);
-SmartPPEService FaceBitState::_smart_ppe_ble;
+Thread FaceBitState::_ble_thread(osPriorityNormal, 2048);
 
-FaceBitState::FaceBitState() :
+
+FaceBitState::FaceBitState(SmartPPEService *smart_ppe_ble, bool *imu_interrupt) :
 _spi(SPI_MOSI, SPI_MISO, SPI_SCK),
 _i2c(I2C_SDA0, I2C_SCL0),
 _imu_cs(IMU_CS),
-_imu_int1(IMU_INT1)
+_smart_ppe_ble(smart_ppe_ble),
+_imu_interrupt(imu_interrupt)
 {
     _bus_control = BusControl::get_instance();
-    _imu_int1.rise(callback(this, &FaceBitState::_imu_int_handler));
 }
 
 FaceBitState::~FaceBitState()
@@ -35,8 +36,14 @@ void FaceBitState::run()
 
     state_timer.start();
 
+    BLE &_ble = BLE::Instance();
+    GattServerProcess _ble_process(ble_queue, _ble);
+    _ble_process.on_init(callback(_smart_ppe_ble, &SmartPPEService::start));
+    
+    _ble_thread.start(callback(&_ble_process, &GattServerProcess::run));
+    
     _force_update = true;
-    _sync_data();
+    _sync_data(&_ble_process);
 
     while(1)
     {
@@ -46,7 +53,7 @@ void FaceBitState::run()
         
         if (ts - _last_ble_ts > BLE_BROADCAST_PERIOD)
         {
-            _sync_data();
+            _sync_data(&_ble_process);
             _last_ble_ts = ts;
         }
 
@@ -277,20 +284,14 @@ void FaceBitState::update_state(uint32_t ts)
     }
 }
 
-void FaceBitState::_imu_int_handler()
-{
-    _imu_interrupt = true;
-}
-
 bool FaceBitState::_get_imu_int()
 {
-    bool tmp = _imu_interrupt;
-    _imu_interrupt = false;
+    bool tmp = *_imu_interrupt;
+    *_imu_interrupt = false;
     return tmp;
 }
 
-
-bool FaceBitState::_sync_data()
+bool FaceBitState::_sync_data(GattServerProcess *_ble_process)
 {    
     LOG_INFO("%s", "BLE BROADCAST");
 
@@ -299,30 +300,22 @@ bool FaceBitState::_sync_data()
         return false;
     }
 
-    BLE &ble = BLE::Instance();
-
-    GattServerProcess ble_process(ble_queue, ble);
-
-    ble_process.on_init(callback(&_smart_ppe_ble, &SmartPPEService::start));
-
-    Thread _ble_thread(osPriorityNormal, 2048);
-    _ble_thread.start(callback(&ble_process, &GattServerProcess::start));
+    // start ble
+    _ble_thread.flags_set(START_BLE);
 
     // wait for connection
     LowPowerTimer ble_timeout;
     ble_timeout.start();
-    while(!ble_process.is_connected())
+    while(!_ble_process->is_connected())
     {
         Thread::State state = _ble_thread.get_state();
-        uint16_t size = ble_process.event_queue_size;
+        uint16_t size = _ble_process->event_queue_size;
         LOG_TRACE("Thread state = %u, equeue size = %u", state, size);
         
         if (ble_timeout.read_ms() > BLE_CONNECTION_TIMEOUT)
         {
             LOG_INFO("%s", "TIMEOUT BEFORE BLE CONNECTION");
-            ble_process.stop(); 
-            _ble_thread.terminate();
-            // ble_queue.break_dispatch();
+            _ble_thread.flags_set(STOP_BLE);
             return false;
         }
 
@@ -332,25 +325,23 @@ bool FaceBitState::_sync_data()
     ThisThread::sleep_for(5s);
 
     // set mask on characteristic based on state
-    _smart_ppe_ble.updateMaskOn(_mask_state_change_ts, _mask_state);
-    _smart_ppe_ble.updateDataReady(_smart_ppe_ble.MASK_ON);
+    _smart_ppe_ble->updateMaskOn(_mask_state_change_ts, _mask_state);
+    _smart_ppe_ble->updateDataReady(_smart_ppe_ble->MASK_ON);
 
     // sync timestamp
-    _smart_ppe_ble.updateTime(time(NULL));
-    set_time(_smart_ppe_ble.getTime());
+    _smart_ppe_ble->updateTime(time(NULL));
+    set_time(_smart_ppe_ble->getTime());
     LOG_INFO("Time set to %lli", time(NULL));
 
     ble_timeout.reset();
     ble_timeout.start();
 
-    while(_smart_ppe_ble.getDataReady() != _smart_ppe_ble.NO_DATA)
+    while(_smart_ppe_ble->getDataReady() != _smart_ppe_ble->NO_DATA)
     {
         if (ble_timeout.read_ms() > BLE_DRDY_TIMEOUT)
         {
             LOG_INFO("%s", "BLE DATA READY TIMEOUT (MASK ON)");
-            ble_process.stop(); 
-            _ble_thread.terminate();
-            ble_queue.break_dispatch();
+            _ble_thread.flags_set(STOP_BLE);
             return false;
         }
     }
@@ -359,14 +350,12 @@ bool FaceBitState::_sync_data()
     {
         ble_timeout.reset();
         ble_timeout.start();
-        while(_smart_ppe_ble.getDataReady() != _smart_ppe_ble.NO_DATA)
+        while(_smart_ppe_ble->getDataReady() != _smart_ppe_ble->NO_DATA)
         {
             if (ble_timeout.read_ms() > BLE_DRDY_TIMEOUT)
             {
                 LOG_INFO("%s", "BLE DATA READY TIMEOUT (DATA)");
-                ble_process.stop(); 
-                _ble_thread.terminate();
-                ble_queue.break_dispatch();
+                _ble_thread.flags_set(STOP_BLE);
                 return false;
             }
         }
@@ -376,13 +365,13 @@ bool FaceBitState::_sync_data()
         switch(next_data_point.data_type)
         {
             case HEART_RATE:
-                _smart_ppe_ble.updateHeartRate(next_data_point.timestamp, next_data_point.value);
-                _smart_ppe_ble.updateDataReady(_smart_ppe_ble.HEART_RATE);
+                _smart_ppe_ble->updateHeartRate(next_data_point.timestamp, next_data_point.value);
+                _smart_ppe_ble->updateDataReady(_smart_ppe_ble->HEART_RATE);
                 break;
             
             case RESPIRATORY_RATE:
-                _smart_ppe_ble.updateRespiratoryRate(next_data_point.timestamp, next_data_point.value);
-                _smart_ppe_ble.updateDataReady(_smart_ppe_ble.RESPIRATORY_RATE);
+                _smart_ppe_ble->updateRespiratoryRate(next_data_point.timestamp, next_data_point.value);
+                _smart_ppe_ble->updateDataReady(_smart_ppe_ble->RESPIRATORY_RATE);
                 break;
 
             case MASK_FIT:
@@ -396,9 +385,7 @@ bool FaceBitState::_sync_data()
         data_buffer.clear();
     }
 
-    ble_process.stop(); 
-    _ble_thread.terminate();
-    ble_queue.break_dispatch();
+    _ble_thread.flags_set(STOP_BLE);
 
     return true;
 }

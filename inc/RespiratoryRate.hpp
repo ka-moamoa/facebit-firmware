@@ -8,9 +8,6 @@
 class RespiratoryRate
 {
 public:
-    RespiratoryRate(CapCalc *cap, Si7051 &temp);
-    ~RespiratoryRate();
-
     typedef struct
     {
         int rate;
@@ -22,6 +19,11 @@ public:
         int breath_count;
         uint64_t duration;
     } RR_d;
+
+    RespiratoryRate(CapCalc *cap, Si7051 &temp);
+    ~RespiratoryRate();
+
+    RR_t get_buffer_element();
 
     void get_resp_rate();
     

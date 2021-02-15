@@ -10,6 +10,13 @@ RespiratoryRate::~RespiratoryRate()
 {
 }
 
+RespiratoryRate::RR_t RespiratoryRate::get_buffer_element()
+{
+    RR_t tmp = respiratory_rate_buffer.at(0);
+    respiratory_rate_buffer.erase(respiratory_rate_buffer.begin());
+    return tmp;
+}
+
 RespiratoryRate::RR_d RespiratoryRate::calc_resp_rate(float samples[], int SAMPLE_SIZE, float mean)
 {
     int i = 1;
