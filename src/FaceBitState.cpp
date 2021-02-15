@@ -331,28 +331,25 @@ bool FaceBitState::_sync_data(GattServerProcess *_ble_process)
             return false;
         }
 
-        ThisThread::sleep_for(250ms);
+        ThisThread::sleep_for(10ms);
     }
-
-    ThisThread::sleep_for(1s);
 
     // set mask on characteristic based on state
     _smart_ppe_ble->updateMaskOn(_mask_state_change_ts, _mask_state);
 
-    // sync timestamp
-    // _smart_ppe_ble->updateTime(time(NULL));
-    uint64_t new_time = _smart_ppe_ble->getTime();
-    if (new_time != 0)
-    {
-        set_time(_smart_ppe_ble->getTime());
-        LOG_INFO("Time set to %lli", time(NULL));
-    }
-
     ble_timeout.reset();
     ble_timeout.start();
-    while(_smart_ppe_ble->getDataReady() != _smart_ppe_ble->NO_DATA)
-    {
-        _smart_ppe_ble->updateDataReady(_smart_ppe_ble->MASK_ON);
+    while(1)
+    { 
+        LOG_DEBUG("%s", "UPDATING DRDY");
+        _smart_ppe_ble->updateDataReady(SmartPPEService::PRESSURE);
+
+        SmartPPEService::data_ready_t data_ready =  _smart_ppe_ble->getDataReady();
+
+        if (data_ready == SmartPPEService::NO_DATA)
+        {
+            break;
+        }
 
         if (ble_timeout.read_ms() > BLE_DRDY_TIMEOUT)
         {
@@ -362,6 +359,14 @@ bool FaceBitState::_sync_data(GattServerProcess *_ble_process)
         }
 
         ThisThread::sleep_for(100ms);
+    }
+
+    // sync timestamp
+    uint64_t new_time = _smart_ppe_ble->getTime();
+    if (new_time != 0)
+    {
+        set_time(_smart_ppe_ble->getTime());
+        LOG_INFO("Time set to %lli", time(NULL));
     }
 
     if (data_buffer.size() == 0)
