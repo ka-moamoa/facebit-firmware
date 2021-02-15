@@ -1,4 +1,5 @@
 #include "RespiratoryRate.hpp"
+#include "Utilites.h"
 
 RespiratoryRate::RespiratoryRate(CapCalc *cap, Si7051 &temp) : _cap(cap),
                                                                _temp(temp)
@@ -129,12 +130,12 @@ bool RespiratoryRate::get_resp_rate()
             printf("Sample discarded... Wait for the new reading\r\n");
         }
 
-        if (resp_rate > 4 && resp_rate < 35)
+        if (resp_rate > 4 && resp_rate < 25)
         {
             new_resp_rate = true;
             
             RR_t new_rate;
-            new_rate.rate = resp_rate;
+            new_rate.rate = Utilities::round(resp_rate * 10);
             new_rate.timestamp = time(NULL);
 
             respiratory_rate_buffer.push_back(new_rate);
