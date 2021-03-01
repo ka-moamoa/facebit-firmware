@@ -1,5 +1,5 @@
 #include "BCG.h"
-#include "SWOLogger.h"
+#include "Logger.h"
 #include "Utilites.h"
 #include <numeric>
 
@@ -11,6 +11,7 @@ _g_drdy(int1_pin)
     _bus_control = BusControl::get_instance();
     _spi = spi;
     _cs = cs;
+    _logger = Logger::get_instance();
 }
 
 BCG::~BCG()
@@ -89,7 +90,7 @@ bool BCG::bcg(const seconds num_seconds)
     LowPowerTimer zc_timer;
     zc_timer.start();
 
-    LOG_INFO("%s", "SENSING HR");
+    _logger->log(TRACE_INFO, "%s", "SENSING HR");
 
     // acquire and process samples until num_seconds has elapsed
     while(zc_timer.elapsed_time() <= duration_cast<microseconds>(num_seconds))
@@ -117,7 +118,7 @@ bool BCG::bcg(const seconds num_seconds)
 
             // send l2norm through hr isolation filter
             float next_bcg_val = hr_isolation.step(mag);
-            // LOG_INFO("bcg val = %0.2f", next_bcg_val);
+            // _logger->log(TRACE_INFO, "bcg val = %0.2f", next_bcg_val);
             
             // look for a descending zero-cross
             if (last_bcg_val > 0 && next_bcg_val <= 0)
@@ -157,7 +158,7 @@ bool BCG::bcg(const seconds num_seconds)
                             new_hr.rate = rate;
                             new_hr.timestamp = time(NULL);
 
-                            // LOG_INFO("New HR reading --> rate: %0.1f, time: %lli", rate_raw, new_hr.timestamp);
+                            // _logger->log(TRACE_INFO, "New HR reading --> rate: %0.1f, time: %lli", rate_raw, new_hr.timestamp);
 
                             while (_HR.size() >= HR_BUFFER_SIZE)
                             {
@@ -214,7 +215,7 @@ double BCG::_l2norm(double x, double y, double z)
 // {
 //     if (_g_x.size() < MIN_SAMPLES)
 //     {
-//         LOG_WARNING("fewer samples than recommended (%u of %u)", _g_x.size(), MIN_SAMPLES);
+//         _logger->log(TRACE_WARNING, "fewer samples than recommended (%u of %u)", _g_x.size(), MIN_SAMPLES);
 //     }
 
 //     // printf("pre-filter:\r\n");
@@ -278,7 +279,7 @@ double BCG::_l2norm(double x, double y, double z)
 //     }
 
 //     float HR = max_val_frequency * 60.0;
-//     LOG_INFO("HR = %0.1f", HR);
+//     _logger->log(TRACE_INFO, "HR = %0.1f", HR);
 
 //     return (uint8_t)Utilities::round(HR);
 // }
@@ -340,19 +341,19 @@ double BCG::_l2norm(double x, double y, double z)
                 //     {
                 //          result += (1.0 / (descending_zc_timestamps.at(i) - descending_zc_timestamps.at(i-1))) * 60.0 * 1.0 / INSTANT_AVERAGE;
                 //     }
-                //     LOG_INFO("HR = %f", result);
+                //     _logger->log(TRACE_INFO, "HR = %f", result);
                 // }
 
 
     // // now that we've collected and processed the samples, let's see how clean the signal looks
     // if (num_zc < 3)
     // {
-    //     LOG_WARNING("Not enough zero-crosses to detect HR! Detected only %u.", num_zc);
+    //     _logger->log(TRACE_WARNING, "Not enough zero-crosses to detect HR! Detected only %u.", num_zc);
     //     return -1;
     // }
     // if (collection_time < 3)
     // {
-    //     LOG_WARNING("Collection time not long enough to calculate HR! Only %0.2f s", collection_time);
+    //     _logger->log(TRACE_WARNING, "Collection time not long enough to calculate HR! Only %0.2f s", collection_time);
     // }
     // // others checks here as we come up with them...
 
@@ -366,7 +367,7 @@ double BCG::_l2norm(double x, double y, double z)
     // }
 
     // float HR = HR_sum / descending_zc_timestamps.size();
-    // LOG_INFO("HR = %0.1f", HR);
+    // _logger->log(TRACE_INFO, "HR = %0.1f", HR);
 
     //     float sum = 0;
     // uint8_t size = _HR.size();

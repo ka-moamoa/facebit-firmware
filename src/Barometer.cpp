@@ -8,6 +8,7 @@ _barometer(spi, cs_pin),
 _int_pin(int_pin),
 _t_barometer()
 {
+    _logger = Logger::get_instance();
 }
 
 Barometer::~Barometer()
@@ -18,7 +19,7 @@ bool Barometer::initialize()
 {
     if (_initialized)
     {
-        LOG_INFO("%s", "Barometer has already been initialized");
+        _logger->log(TRACE_INFO, "%s", "Barometer has already been initialized");
         return false;
     }
 
@@ -26,7 +27,7 @@ bool Barometer::initialize()
 
     if (_bus_control->get_spi_power() == false)
     {
-        LOG_WARNING("%s", "SPI bus not powered, cannot initialize");
+        _logger->log(TRACE_WARNING, "%s", "SPI bus not powered, cannot initialize");
         return false;
     }
 
@@ -57,7 +58,7 @@ bool Barometer::initialize()
 
     _int_pin.rise(callback(this, &Barometer::bar_data_ready));
 
-    LOG_TRACE("%s", "Barometer initialized successfully");
+    _logger->log(TRACE_TRACE, "%s", "Barometer initialized successfully");
     _t_barometer.start();
     _initialized = true;
     return true;
@@ -82,7 +83,7 @@ bool Barometer::update()
         _barometer.get_fifo_status(&fifo_status);
         if (!fifo_status.FIFO_FULL)
         {
-            LOG_DEBUG("%s", "FIFO not full, but interrupt triggered");
+            _logger->log(TRACE_DEBUG, "%s", "FIFO not full, but interrupt triggered");
             return false;
         }
 
@@ -150,7 +151,7 @@ bool Barometer::read_buffered_data()
 {
     if (_barometer.get_fifo(_pressure_buffer, _temperature_buffer) == LPS22HB_ERROR)
     {
-        LOG_WARNING("%s", "Unable to read barometer data");
+        _logger->log(TRACE_WARNING, "%s", "Unable to read barometer data");
         return false;
     }
 
@@ -175,38 +176,51 @@ void Barometer::set_max_buffer_size(uint16_t size)
     _max_buffer_size = size;
 }
 
-// Purgatory
+/*DINOSAURS
+   *                               *     _
+        /\     *            ___.       /  `)
+    *  //\\    /\          ///\\      / /
+      ///\\\  //\\/\      ////\\\    / /     /\
+     ////\\\\///\\/\\.-~~-.///\\\\  / /     //\\
+    /////\\\\///\\/         `\\\\\\/ /     ///\\
+   //////\\\\// /            `\\\\/ /     ////\\
+  ///////\\\\\//               `~` /\    /////\\
+ ////////\\\\\/      ,_____,   ,-~ \\\__//////\\\
+ ////////\\\\/  /~|  |/////|  |\\\\\\\\@//jro/\\
+ //<           / /|__|/////|__|///////~|~/////\\
+ ~~~     ~~   ` ~   ..   ~  ~    .     ~` `   '.
+ ~ _  -  -~.    .'   .`  ~ .,    '.    ~~ .  '*/
 
     // if (status.FIFO_EMPTY != _last_fifo_empty && status.FIFO_EMPTY)
     // {
-    //     LOG_DEBUG("Fifo Empty! = %u", status.FIFO_LEVEL);
+    //     _logger->log(TRACE_DEBUG, "Fifo Empty! = %u", status.FIFO_LEVEL);
     //     _last_fifo_empty = status.FIFO_EMPTY;
     // }
     // if (status.FIFO_FULL != _last_fifo_full && status.FIFO_FULL)
     // {
-    //     LOG_DEBUG("FIFO full! = %u", status.FIFO_LEVEL);
+    //     _logger->log(TRACE_DEBUG, "FIFO full! = %u", status.FIFO_LEVEL);
     //     _last_fifo_full = status.FIFO_FULL;
     // }
     // if (status.FIFO_OVR != _last_fifo_ovr && status.FIFO_OVR)
     // {
-    //     LOG_DEBUG("FIFO overfull! = %u", status.FIFO_LEVEL);
+    //     _logger->log(TRACE_DEBUG, "FIFO overfull! = %u", status.FIFO_LEVEL);
     //     _last_fifo_ovr = status.FIFO_OVR;
     // }
     // if (status.FIFO_FTH != _last_fifo_fth && status.FIFO_FTH)
     // {
-    //     LOG_DEBUG("FIFO FTH! = %u", status.FIFO_LEVEL)
+    //     _logger->log(TRACE_DEBUG, "FIFO FTH! = %u", status.FIFO_LEVEL)
     //     _last_fifo_fth = status.FIFO_FTH;
     // }
     // if (status.FIFO_LEVEL != _last_fifo_level)
     // {
-    //     LOG_DEBUG("FIFO level = %u", status.FIFO_LEVEL);
+    //     _logger->log(TRACE_DEBUG, "FIFO level = %u", status.FIFO_LEVEL);
     //     _last_fifo_level = status.FIFO_LEVEL;
     // }
 
             // uint8_t mode = 255;
         // _barometer.get_fifo_mode(&mode);
-        // LOG_INFO("fifo mode = %u", mode);
+        // _logger->log(TRACE_INFO, "fifo mode = %u", mode);
 
         // uint8_t enabled = 255;
         // _barometer.get_fifo_enabled(&enabled);
-        // LOG_INFO("fifo enabled = %u", enabled);
+        // _logger->log(TRACE_INFO, "fifo enabled = %u", enabled);

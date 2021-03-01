@@ -32,11 +32,12 @@ THE SOFTWARE.
 #include "Si7051.h"
 #include "LowPowerTimer.h"
 #include "I2C.h"
-#include "SWOLogger.h"
+#include "Logger.h"
 #include "Utilites.h"
 
 Si7051::Si7051(I2C *i2c, char address)
 {
+	_logger = Logger::get_instance();
 	_i2c = i2c;
 	_address = address;
 }
@@ -55,10 +56,10 @@ void Si7051::reset()
 {
 	_i2c->start();
 	bool ack = _i2c->write(_address | WRITE);
-	if (!ack) { LOG_WARNING("%s", "nack reset address stage") };
+	if (!ack) { _logger->log(TRACE_WARNING, "nack reset address stage"); };
 	
 	ack = _i2c->write(RESET);
-	if (!ack) { LOG_WARNING("%s", "nack reset cmd stage") };
+	if (!ack) { _logger->log(TRACE_WARNING, "nack reset cmd stage"); };
 
 	_i2c->stop();
 
@@ -71,13 +72,13 @@ uint8_t Si7051::readFirmwareVersion()
 	_i2c->start();
 
 	bool ack = _i2c->write(_address | WRITE); // write command
-	if (!ack) { LOG_WARNING("%s", "nack fw address stage") };
+	if (!ack) { _logger->log(TRACE_WARNING, "nack fw address stage"); };
 	
 	ack = _i2c->write(READ_FW_REV[0]);
-	if (!ack) { LOG_WARNING("%s", "nack fw cmd1 stage") };
+	if (!ack) { _logger->log(TRACE_WARNING, "nack fw cmd1 stage"); };
 
 	ack = _i2c->write(READ_FW_REV[1]);
-	if (!ack) { LOG_WARNING("%s", "nack fw cmd2 stage") };
+	if (!ack) { _logger->log(TRACE_WARNING, "nack fw cmd2 stage"); };
 
 	_i2c->start();
 	_i2c->write(_address | READ);
@@ -112,10 +113,10 @@ void Si7051::setResolution(uint8_t resolution)
 	_i2c->start();
 
 	bool ack = _i2c->write(_address | WRITE);
-	if (!ack) { LOG_WARNING("%s", "nack set res address stage") };
+	if (!ack) { _logger->log(TRACE_WARNING, "nack set res address stage"); };
 
 	ack = _i2c->write(WRITE_UR);
-	if (!ack) { LOG_WARNING("%s", "nack set res cmd stage") };
+	if (!ack) { _logger->log(TRACE_WARNING, "nack set res cmd stage"); };
 
 	ack = _i2c->write(reg.rawData);
 	_i2c->read(true); // this is to "ack" the write
@@ -128,10 +129,10 @@ float Si7051::readTemperature()
 	_i2c->start();
 
 	bool ack = _i2c->write(_address | WRITE);
-	if (!ack) { LOG_WARNING("%s", "nack address stage") };
+	if (!ack) { _logger->log(TRACE_WARNING, "nack address stage"); };
 
 	ack = _i2c->write(MEASURE_NOHOLD);
-	if (!ack) { LOG_WARNING("%s", "nack measure cmd stage") };
+	if (!ack) { _logger->log(TRACE_WARNING, "nack measure cmd stage"); };
 
 	LowPowerTimer timeout;
 	timeout.start();
@@ -144,12 +145,12 @@ float Si7051::readTemperature()
 		ThisThread::sleep_for(4ms);
 		_i2c->start();
 		ack = _i2c->write(_address | READ);
-		if (!ack) { LOG_DEBUG("nack from temp sensor. waiting... %lli ms", std::chrono::duration_cast<std::chrono::milliseconds>(timeout.elapsed_time()).count()); }
+		if (!ack) { _logger->log(TRACE_DEBUG, "nack from temp sensor. waiting... %lli ms", std::chrono::duration_cast<std::chrono::milliseconds>(timeout.elapsed_time()).count()); }
 	}
 	timeout.stop();
 	if (ack == false)
 	{
-		LOG_WARNING("%s", "Temp sensor timeout without response");
+		_logger->log(TRACE_WARNING, "Temp sensor timeout without response");
 		return -999.999;
 	}
 	

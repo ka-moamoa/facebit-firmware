@@ -33,6 +33,8 @@ private:
     PinName _cs;
     LowPowerTimer _sample_timer;
 
+    Logger* _logger;
+
     const uint8_t HR_BUFFER_SIZE = 20; // how many heart rates we want to store on device
     vector<HR_t> _HR;
 

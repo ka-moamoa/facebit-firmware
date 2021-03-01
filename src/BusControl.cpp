@@ -1,6 +1,8 @@
 #include "BusControl.h"
-#include "PinNames.h"
-#include "SWOLogger.h"
+#include "rtos.h"
+#include "nrf51_to_nrf52.h"
+#include "nrf52_bitfields.h"
+#include "TARGET_SMARTPPE/PinNames.h"
 
 BusControl* BusControl::_instance = nullptr;
 Mutex BusControl::_mutex;
@@ -19,7 +21,7 @@ _voc_vcc(VOC_VCC),
 _i2c_pu(I2C_PULLUP),
 _led(LED1)
 {
-
+    _logger = Logger::get_instance();
 }
 
 BusControl::~BusControl() {}
@@ -85,7 +87,7 @@ void BusControl::spi_power(bool power)
 {
     if (!_initialized)
     {
-        LOG_WARNING("%s", "Bus Control has not been initialized. Please run init().")
+        _logger->log(TRACE_WARNING, "%s", "Bus Control has not been initialized. Please run init().");
         return;
     }
 
@@ -123,7 +125,7 @@ void BusControl::i2c_power(bool power)
 {
     if (!_initialized)
     {
-        LOG_WARNING("%s", "Bus Control has not been initialized. Please run init().")
+        _logger->log(TRACE_WARNING, "%s", "Bus Control has not been initialized. Please run init().");
         return;
     }
 
@@ -139,7 +141,7 @@ void BusControl::i2c_power(bool power)
 void BusControl::blink_led()
 {
     _led = 1;
-    ThisThread::sleep_for(100ms);
+    ThisThread::sleep_for(10ms);
     _led = 0;
 }
 

@@ -3,6 +3,7 @@
 
 MaskStateDetection::MaskStateDetection(Barometer* barometer)
 {
+    _logger = Logger::get_instance();
     _barometer = barometer;
 }
 
@@ -12,7 +13,7 @@ MaskStateDetection::~MaskStateDetection()
 
 MaskStateDetection::MASK_STATE_t MaskStateDetection::is_on()
 {
-    LOG_INFO("%s", "CHECKING MASK ON");
+    _logger->log(TRACE_INFO, "%s", "CHECKING MASK ON");
 
     BusControl* _bus_control = BusControl::get_instance();
     _bus_control->spi_power(true);
@@ -23,7 +24,7 @@ MaskStateDetection::MASK_STATE_t MaskStateDetection::is_on()
 
     if (!_barometer->initialize() || !_barometer->set_fifo_full_interrupt(true))
     {
-        LOG_WARNING("%s", "barometer failed to initialize");
+        _logger->log(TRACE_WARNING, "%s", "barometer failed to initialize");
         return ERROR;
     }
 
@@ -55,7 +56,7 @@ MaskStateDetection::MASK_STATE_t MaskStateDetection::is_on()
             }
             
             uint16_t diff = abs(max - min);
-            LOG_TRACE("max/min diff = %u", diff);
+            _logger->log(TRACE_TRACE, "max/min diff = %u", diff);
 
             if (diff > ON_THRESHOLD) return ON;
             else return OFF;

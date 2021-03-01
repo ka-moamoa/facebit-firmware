@@ -2,7 +2,7 @@
 #define BAROMETER_H_
 
 #include "LPS22HBSensor.h"
-#include "SWOLogger.h"
+#include "Logger.h"
 #include "BusControl.h"
 
 class Barometer
@@ -33,6 +33,7 @@ public:
     void clear_buffers() { _temperature_buffer.clear(); _pressure_buffer.clear(); };
     uint64_t get_delta_timestamp(bool broadcast);
     uint32_t get_measurement_frequencyx100() { return _measurement_frequencyx100; };
+
 private:
     bool _initialized = false;
     bool _bar_data_ready = false;
@@ -50,6 +51,8 @@ private:
     LPS22HBSensor _barometer;
     InterruptIn _int_pin;
     LowPowerTimer _t_barometer;
+
+    Logger* _logger;
 
     void bar_data_ready();
     bool read_buffered_data();

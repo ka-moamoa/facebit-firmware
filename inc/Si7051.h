@@ -34,6 +34,7 @@ THE SOFTWARE.
 
 #include "mbed.h"
 #include <vector>
+#include "Logger.h"
 
 #define SI7051_ADDRESS (0x40 << 1)
 
@@ -82,6 +83,8 @@ private:
 	uint64_t _last_measurement_timestamp = 0;
 	uint64_t _last_broadcast_timestamp = 0;
 	uint32_t _actual_frequencyx100 = 0;
+
+	Logger* _logger;
 
 	const char MEASURE_HOLD = 0xE3;
 	const char MEASURE_NOHOLD = 0xF3;

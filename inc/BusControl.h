@@ -3,6 +3,7 @@
 
 #include "mbed.h"
 #include "Mutex.h"
+#include "Logger.h"
 
 class BusControl
 {
@@ -35,6 +36,8 @@ public:
 private:
     BusControl(); //Singleton
     ~BusControl();
+
+    Logger* _logger;
 
     // SPI device power
     DigitalOut _fram_vcc;

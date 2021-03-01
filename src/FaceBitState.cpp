@@ -9,7 +9,8 @@
 #include "MaskStateDetection.hpp"
 #include "RespiratoryRate.hpp"
 #include "ble_process.h"
-
+#include "LowPowerTimer.h"
+#include "TARGET_SMARTPPE/PinNames.h"
 
 events::EventQueue FaceBitState::ble_queue(16 * EVENTS_EVENT_SIZE);
 Thread FaceBitState::_ble_thread(osPriorityNormal, 4096);
@@ -21,6 +22,7 @@ _imu_cs(IMU_CS),
 _smart_ppe_ble(smart_ppe_ble),
 _imu_interrupt(imu_interrupt)
 {
+    _logger = Logger::get_instance();
     _bus_control = BusControl::get_instance();
 }
 
@@ -56,7 +58,7 @@ void FaceBitState::run()
             _last_ble_ts = ts;
         }
 
-        LOG_TRACE("sleeping for %lli", static_cast<long long int>(_sleep_duration.count()));
+        _logger->log(TRACE_TRACE, "sleeping for %lli", static_cast<long long int>(_sleep_duration.count()));
         ThisThread::sleep_for(_sleep_duration);
     }
 }
@@ -87,7 +89,7 @@ void FaceBitState::update_state(uint32_t ts)
 
             if (_get_imu_int())
             {
-                LOG_INFO("%s", "MOTION DETECTED");
+                _logger->log(TRACE_INFO, "%s", "MOTION DETECTED");
                 _next_mask_state = OFF_FACE_ACTIVE;
 
                 _bus_control->spi_power(true);
@@ -120,16 +122,16 @@ void FaceBitState::update_state(uint32_t ts)
 
             if (mask_status == MaskStateDetection::ON)
             {
-                LOG_INFO("%s", "MASK ON");
+                _logger->log(TRACE_INFO, "%s", "MASK ON");
                 _next_mask_state = ON_FACE;
             }
             else if (mask_status == MaskStateDetection::OFF)
             {
-                LOG_INFO("%s", "MASK OFF");
+                _logger->log(TRACE_INFO, "%s", "MASK OFF");
             }
             else if (mask_status == MaskStateDetection::ERROR)
             {
-                LOG_WARNING("%s", "MASK DETECTION ERROR");
+                _logger->log(TRACE_WARNING, "%s", "MASK DETECTION ERROR");
             }
 
             if(ts - ACTIVE_STATE_ENTRY_TS > ACTIVE_STATE_TIMEOUT)
@@ -196,13 +198,13 @@ void FaceBitState::update_state(uint32_t ts)
 
                 case MEASURE_HEART_RATE:
                 {
-                    LOG_INFO("%s", "MEASURING HR")
+                    _logger->log(TRACE_INFO, "%s", "MEASURING HR");
                     _last_hr_ts = ts;
                     BCG bcg(&_spi, (PinName)IMU_INT1, (PinName)IMU_CS);
 
                     if(bcg.bcg(15s)) // blocking
                     {
-                        LOG_INFO("%s", "HR CAPTURED!");
+                        _logger->log(TRACE_INFO, "%s", "HR CAPTURED!");
                         for(int i = 0; i < bcg.get_buffer_size(); i++)
                         {
                             FaceBitData hr_data;
@@ -249,24 +251,24 @@ void FaceBitState::update_state(uint32_t ts)
 
             if (mask_status == MaskStateDetection::ON)
             {
-                LOG_INFO("%s", "MASK ON");
+                _logger->log(TRACE_INFO, "%s", "MASK ON");
             }
             else if (mask_status == MaskStateDetection::OFF)
             {
-                LOG_INFO("%s", "MASK OFF");
+                _logger->log(TRACE_INFO, "%s", "MASK OFF");
                 _next_task_state = IDLE;
                 _next_mask_state = OFF_FACE_ACTIVE;
             }
             else if (mask_status == MaskStateDetection::ERROR)
             {
-                LOG_WARNING("%s", "MASK DETECTION ERROR");
+                _logger->log(TRACE_WARNING, "%s", "MASK DETECTION ERROR");
                 _next_task_state = IDLE; // don't run if we don't know
             }
         }
 
         _new_task_state = true;
         _task_state = _next_task_state;
-        LOG_INFO("TASK STATE: %i", _task_state);
+        _logger->log(TRACE_INFO, "TASK STATE: %i", _task_state);
 
         _sleep_duration = 1ms;
     }
@@ -279,7 +281,7 @@ void FaceBitState::update_state(uint32_t ts)
 
         _new_mask_state = true;
         _mask_state = _next_mask_state;
-        LOG_INFO("MASK STATE: %i", _mask_state);
+        _logger->log(TRACE_INFO, "MASK STATE: %i", _mask_state);
 
         _sleep_duration = 10ms;
     }
@@ -300,11 +302,11 @@ bool FaceBitState::_sync_data(GattServerProcess *_ble_process)
 {    
     if (data_buffer.size() == 0 && _force_update == false)
     {
-        LOG_DEBUG("%s", "NO DATA TO SEND")
+        _logger->log(TRACE_DEBUG, "%s", "NO DATA TO SEND");
         return false;
     }
 
-    LOG_DEBUG("%s", "BLE SYNC");
+    _logger->log(TRACE_DEBUG, "%s", "BLE SYNC");
 
     // start ble
     _ble_thread.flags_set(START_BLE);
@@ -316,11 +318,11 @@ bool FaceBitState::_sync_data(GattServerProcess *_ble_process)
     {
         Thread::State state = _ble_thread.get_state();
         uint16_t size = _ble_process->event_queue_size;
-        LOG_TRACE("Thread state = %u, equeue size = %u", state, size);
+        _logger->log(TRACE_TRACE, "Thread state = %u, equeue size = %u", state, size);
         
         if (ble_timeout.read_ms() > BLE_CONNECTION_TIMEOUT)
         {
-            LOG_INFO("%s", "TIMEOUT BEFORE BLE CONNECTION");
+            _logger->log(TRACE_INFO, "%s", "TIMEOUT BEFORE BLE CONNECTION");
             _ble_thread.flags_set(STOP_BLE);
             return false;
         }
@@ -346,7 +348,7 @@ bool FaceBitState::_sync_data(GattServerProcess *_ble_process)
 
         if (ble_timeout.read_ms() > BLE_DRDY_TIMEOUT)
         {
-            LOG_INFO("%s", "BLE DATA READY TIMEOUT (MASK ON)");
+            _logger->log(TRACE_INFO, "%s", "BLE DATA READY TIMEOUT (MASK ON)");
             _ble_thread.flags_set(STOP_BLE);
             return false;
         }
@@ -359,24 +361,24 @@ bool FaceBitState::_sync_data(GattServerProcess *_ble_process)
     if (new_time != 0)
     {
         set_time(_smart_ppe_ble->getTime());
-        LOG_INFO("Time set to %lli", time(NULL));
+        _logger->log(TRACE_INFO, "Time set to %lli", time(NULL));
     }
 
     if (data_buffer.size() == 0)
     {
-        LOG_DEBUG("%s", "NO PHYSIO DATA TO SEND");
+        _logger->log(TRACE_DEBUG, "%s", "NO PHYSIO DATA TO SEND");
     }
 
     for (int i = 0; i < data_buffer.size(); i++)
     {
-        LOG_DEBUG("DATA BUFFER HAS %u ELEMENTS", data_buffer.size());
+        _logger->log(TRACE_DEBUG, "DATA BUFFER HAS %u ELEMENTS", data_buffer.size());
 
         FaceBitData next_data_point = data_buffer.at(i);
 
         switch(next_data_point.data_type)
         {
             case HEART_RATE:
-                LOG_DEBUG("WRITING HR = %u", next_data_point.value);
+                _logger->log(TRACE_DEBUG, "WRITING HR = %u", next_data_point.value);
                 _smart_ppe_ble->updateHeartRate(next_data_point.timestamp, next_data_point.value);
                 _smart_ppe_ble->updateDataReady(_smart_ppe_ble->HEART_RATE);
                 
@@ -387,7 +389,7 @@ bool FaceBitState::_sync_data(GattServerProcess *_ble_process)
                     _smart_ppe_ble->updateDataReady(_smart_ppe_ble->HEART_RATE);
                     if (ble_timeout.read_ms() > BLE_DRDY_TIMEOUT)
                     {
-                        LOG_INFO("%s", "BLE DATA READY TIMEOUT (DATA)");
+                        _logger->log(TRACE_INFO, "%s", "BLE DATA READY TIMEOUT (DATA)");
                         _ble_thread.flags_set(STOP_BLE);
                         return false;
                     }
@@ -396,7 +398,7 @@ bool FaceBitState::_sync_data(GattServerProcess *_ble_process)
                 break;
             
             case RESPIRATORY_RATE:
-                LOG_DEBUG("WRITING RESP RATE = %u", next_data_point.value);
+                _logger->log(TRACE_DEBUG, "WRITING RESP RATE = %u", next_data_point.value);
                 _smart_ppe_ble->updateRespiratoryRate(next_data_point.timestamp, next_data_point.value);
                 _smart_ppe_ble->updateDataReady(_smart_ppe_ble->RESPIRATORY_RATE);
                 ble_timeout.reset();
@@ -406,7 +408,7 @@ bool FaceBitState::_sync_data(GattServerProcess *_ble_process)
                     _smart_ppe_ble->updateDataReady(_smart_ppe_ble->RESPIRATORY_RATE);
                     if (ble_timeout.read_ms() > BLE_DRDY_TIMEOUT)
                     {
-                        LOG_INFO("%s", "BLE DATA READY TIMEOUT (DATA)");
+                        _logger->log(TRACE_INFO, "%s", "BLE DATA READY TIMEOUT (DATA)");
                         _ble_thread.flags_set(STOP_BLE);
                         return false;
                     }

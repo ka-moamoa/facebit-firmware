@@ -29,7 +29,7 @@
             "NRF52_PAN_63",
             "NRF52_PAN_64",
             "MBED_TICKLESS"
-        ],
+            ],
         "detect_code": [
             "1234"
         ]
