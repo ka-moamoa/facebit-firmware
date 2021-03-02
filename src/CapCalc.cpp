@@ -1,10 +1,13 @@
 #include "CapCalc.h"
 #include "nrfx_saadc.h"
+#include "PinNames.h"
 
-CapCalc::CapCalc(PinName cap_voltage, PinName cap_voltage_en, uint32_t capacitance_uF) :
-_cap_voltage(cap_voltage),
-_cap_voltage_en(cap_voltage_en),
-_capacitance_uF(capacitance_uF)
+CapCalc* CapCalc::_instance = nullptr; 
+Mutex CapCalc::_mutex; 
+
+CapCalc::CapCalc() :
+_cap_voltage_en(VCAP_ENABLE),
+_cap_voltage(VCAP)
 {
     _cap_voltage_en = 0;
 
@@ -32,7 +35,21 @@ CapCalc::~CapCalc()
     _cap_voltage_en = 0;
 }
 
-float CapCalc::read_capacitor_voltage()
+CapCalc* CapCalc::get_instance()
+{
+    _mutex.lock();
+
+    if (_instance == nullptr)
+    {
+        _instance = new CapCalc();
+    }
+
+    _mutex.unlock();
+
+    return _instance;
+}
+
+float CapCalc::read_voltage()
 {
     _cap_voltage_en = 1;
     ThisThread::sleep_for(1ms);
@@ -46,7 +63,7 @@ float CapCalc::read_capacitor_voltage()
 
 float CapCalc::calc_joules()
 {
-    float voltage = read_capacitor_voltage();
+    float voltage = read_voltage();
 
     float joules = 0.5 * ((float)_capacitance_uF / 1000000.0) * (voltage * voltage - 1.8*1.8);//the point at which the processor can run
 

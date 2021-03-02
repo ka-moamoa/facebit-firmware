@@ -1,6 +1,8 @@
 #include "BusControl.h"
-#include "PinNames.h"
-#include "SWOLogger.h"
+#include "rtos.h"
+#include "nrf51_to_nrf52.h"
+#include "nrf52_bitfields.h"
+#include "TARGET_SMARTPPE/PinNames.h"
 
 BusControl* BusControl::_instance = nullptr;
 Mutex BusControl::_mutex;
@@ -16,9 +18,10 @@ _bar_cs(BAR_CS),
 _imu_cs(IMU_CS),
 _temp_vcc(TEMP_VCC),
 _voc_vcc(VOC_VCC),
-_i2c_pu(I2C_PULLUP)
+_i2c_pu(I2C_PULLUP),
+_led(LED1)
 {
-
+    _logger = Logger::get_instance();
 }
 
 BusControl::~BusControl() {}
@@ -39,32 +42,80 @@ BusControl* BusControl::get_instance()
 
 void BusControl::init(void)
 {
-    NRF_GPIO->PIN_CNF[IMU_VCC] |= (GPIO_PIN_CNF_DRIVE_S0H1 << GPIO_PIN_CNF_DRIVE_Pos); // set to high drive mode
-    NRF_GPIO->PIN_CNF[TEMP_VCC] |= (GPIO_PIN_CNF_DRIVE_S0H1 << GPIO_PIN_CNF_DRIVE_Pos); // set to high drive mode
-    NRF_GPIO->PIN_CNF[I2C_PULLUP] |= (GPIO_PIN_CNF_DRIVE_S0H1 << GPIO_PIN_CNF_DRIVE_Pos); // set to high drive mode
+    if (!_initialized)
+    {
+        NRF_GPIO->PIN_CNF[IMU_VCC] |= (GPIO_PIN_CNF_DRIVE_S0H1 << GPIO_PIN_CNF_DRIVE_Pos); // set to high drive mode
+        NRF_GPIO->PIN_CNF[TEMP_VCC] |= (GPIO_PIN_CNF_DRIVE_S0H1 << GPIO_PIN_CNF_DRIVE_Pos); // set to high drive mode
+        NRF_GPIO->PIN_CNF[BAR_VCC] |= (GPIO_PIN_CNF_DRIVE_S0H1 << GPIO_PIN_CNF_DRIVE_Pos); // set to high drive mode
+        NRF_GPIO->PIN_CNF[I2C_PULLUP] |= (GPIO_PIN_CNF_DRIVE_S0H1 << GPIO_PIN_CNF_DRIVE_Pos); // set to high drive mode
+        NRF_GPIO->PIN_CNF[FRAM_VCC] |= (GPIO_PIN_CNF_DRIVE_S0H1 << GPIO_PIN_CNF_DRIVE_Pos); // set to high drive mode
+        NRF_GPIO->PIN_CNF[MAG_VCC] |= (GPIO_PIN_CNF_DRIVE_S0H1 << GPIO_PIN_CNF_DRIVE_Pos); // set to high drive mode
+        NRF_GPIO->PIN_CNF[LED1] |= (GPIO_PIN_CNF_DRIVE_S0H1 << GPIO_PIN_CNF_DRIVE_Pos); // set to high drive mode
+    
+        power_lock.fram = false;
+        power_lock.magnetometer = false;
+        power_lock.barometer = false;
+        power_lock.imu = false;
+
+        _spi_power = false;
+        _i2c_power = false;
+    }
 
     _initialized = true;
+}
+
+void BusControl::set_power_lock(SPIDevices device, bool lock)
+{
+    switch(device)
+    {
+        case FRAM:
+            power_lock.fram = lock;
+            break;
+        case MAGNETOMETER:
+            power_lock.magnetometer = lock;
+            break;
+        case BAROMETER:
+            power_lock.barometer = lock;
+            break;
+        case IMU:
+            power_lock.imu = lock;
+            break;
+    }
 }
 
 void BusControl::spi_power(bool power)
 {
     if (!_initialized)
     {
-        LOG_WARNING("%s", "Bus Control has not been initialized. Please run init().")
+        _logger->log(TRACE_WARNING, "%s", "Bus Control has not been initialized. Please run init().");
         return;
     }
 
-    _fram_vcc = power;
-    _bar_vcc = power;
-    _mag_vcc = power;
-    _imu_vcc = power;
+    if (get_spi_power() == power) return;
 
-    _fram_cs = power;
-    _bar_cs = power;
-    _mag_cs = power;
-    _imu_cs = power;
+    if (!power_lock.fram)
+    {
+        _fram_vcc = power;
+        _fram_cs = power;
+    }
 
-    ThisThread::sleep_for(10ms); // give enough time for the devices to power up properly
+    if (!power_lock.barometer)
+    {
+        _bar_vcc = power;
+        _bar_cs = power;
+    }
+
+    if (!power_lock.magnetometer)
+    {
+        _mag_vcc = power;
+        _mag_cs = power;
+    }
+
+    if (!power_lock.imu)
+    {
+        _imu_vcc = power;
+        _imu_cs = power;
+    }
 
     _spi_power = power;
 }
@@ -74,15 +125,24 @@ void BusControl::i2c_power(bool power)
 {
     if (!_initialized)
     {
-        LOG_WARNING("%s", "Bus Control has not been initialized. Please run init().")
+        _logger->log(TRACE_WARNING, "%s", "Bus Control has not been initialized. Please run init().");
         return;
     }
+
+    if (get_i2c_power() == true) return;
 
     _temp_vcc = power;
     _voc_vcc = power;
     _i2c_pu = power;
 
     _i2c_power = power;
+}
+
+void BusControl::blink_led()
+{
+    _led = 1;
+    ThisThread::sleep_for(10ms);
+    _led = 0;
 }
 
 bool BusControl::get_spi_power()

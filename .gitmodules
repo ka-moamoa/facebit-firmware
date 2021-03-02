@@ -1,0 +1,6 @@
+[submodule "smartppe-ble-utils"]
+	path = smartppe-ble-utils
+	url = https://gitlab.com/ka-moamoa/smart-ppe/smartppe-ble-utils.git
+[submodule "iir-filter-kit"]
+	path = iir-filter-kit
+	url = https://gitlab.com/ka-moamoa/iir-filter-kit.git

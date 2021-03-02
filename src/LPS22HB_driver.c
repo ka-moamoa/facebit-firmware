@@ -1395,12 +1395,12 @@ LPS22HB_Error_et LPS22HB_Init(void *handle)
   if(LPS22HB_SwResetAndMemoryBoot(handle))
     return LPS22HB_ERROR;
 
- pLPS22HBInit.PowerMode=LPS22HB_LowNoise;
+ pLPS22HBInit.PowerMode=LPS22HB_LowPower;
  pLPS22HBInit.OutputDataRate=LPS22HB_ODR_ONE_SHOT;
  pLPS22HBInit.LowPassFilter=LPS22HB_DISABLE;
  pLPS22HBInit.LPF_Cutoff=LPS22HB_ODR_9;
  pLPS22HBInit.BDU=LPS22HB_BDU_NO_UPDATE;
- pLPS22HBInit.IfAddInc=LPS22HB_DISABLE; //default
+ pLPS22HBInit.IfAddInc=LPS22HB_ENABLE; //default
  pLPS22HBInit.Sim= LPS22HB_SPI_4_WIRE;
 
  /* Set Generic Configuration*/

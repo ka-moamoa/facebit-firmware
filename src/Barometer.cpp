@@ -1,9 +1,14 @@
 #include "Barometer.hpp"
+#include "Utilites.h"
+
+using namespace std::chrono;
 
 Barometer::Barometer(SPI *spi, PinName cs_pin, PinName int_pin) :
 _barometer(spi, cs_pin),
-_int_pin(int_pin)
+_int_pin(int_pin),
+_t_barometer()
 {
+    _logger = Logger::get_instance();
 }
 
 Barometer::~Barometer()
@@ -14,7 +19,7 @@ bool Barometer::initialize()
 {
     if (_initialized)
     {
-        LOG_INFO("%s", "Barometer has already been initialized");
+        _logger->log(TRACE_INFO, "%s", "Barometer has already been initialized");
         return false;
     }
 
@@ -22,7 +27,7 @@ bool Barometer::initialize()
 
     if (_bus_control->get_spi_power() == false)
     {
-        LOG_WARNING("%s", "SPI bus not powered, cannot initialize");
+        _logger->log(TRACE_WARNING, "%s", "SPI bus not powered, cannot initialize");
         return false;
     }
 
@@ -31,7 +36,7 @@ bool Barometer::initialize()
         return false;
     }
 
-    if (_barometer.set_odr(10.0) == LPS22HB_ERROR)
+    if (_barometer.set_odr(BAROMETER_FREQUENCY) == LPS22HB_ERROR)
     {
         return false;
     }
@@ -41,12 +46,7 @@ bool Barometer::initialize()
         return false;
     }
 
-    if (_barometer.set_fifo_mode(1) == LPS22HB_ERROR) // Stream mode
-    {
-        return false;
-    }
-
-    if (_barometer.enable_fifo_full_interrupt() == LPS22HB_ERROR)
+    if (_barometer.set_fifo_mode(3) == LPS22HB_ERROR) // Stream-to-fifo mode
     {
         return false;
     }
@@ -58,123 +58,169 @@ bool Barometer::initialize()
 
     _int_pin.rise(callback(this, &Barometer::bar_data_ready));
 
-    LOG_DEBUG("%s", "Barometer initialized successfully");
+    _logger->log(TRACE_TRACE, "%s", "Barometer initialized successfully");
+    _t_barometer.start();
     _initialized = true;
+    return true;
+}
+
+bool Barometer::set_fifo_full_interrupt(bool enable)
+{
+    if (_barometer.fifo_full_interrupt(enable) == LPS22HB_ERROR)
+    {
+        return false;
+    }
+    
     return true;
 }
 
 bool Barometer::update()
 {
-    LPS22HB_FifoStatus_st status;
-    _barometer.get_fifo_status(&status);
-
     // if the interrupt has been triggered, read the data
     if (_bar_data_ready)
     {
-        read_buffered_data();
+        LPS22HB_FifoStatus_st fifo_status;
+        _barometer.get_fifo_status(&fifo_status);
+        if (!fifo_status.FIFO_FULL)
+        {
+            _logger->log(TRACE_DEBUG, "%s", "FIFO not full, but interrupt triggered");
+            return false;
+        }
+
+        LPS22HB_InterruptDiffStatus_st interrupt_source;
+        _barometer.get_interrupt_status(&interrupt_source);
+        if (interrupt_source.PH)
+        {
+            _high_pressure_event_flag = true;
+        }
+
+        if (!read_buffered_data())
+        {
+            return false;
+        }
+        
         return true;
     }
 
     return false;
 }
 
-void Barometer::get_pressure_buffer(float *pressure_data, uint8_t num_elements)
+bool Barometer::enable_pressure_threshold(bool enable, bool high_pressure, bool low_pressure)
 {
-    if (num_elements > FIFO_LENGTH)
+    if (_barometer.differential_interrupt(enable, high_pressure, low_pressure) == LPS22HB_ERROR)
     {
-        LOG_WARNING("Can only return up to %u elements", FIFO_LENGTH)
-        return;
-    }
-
-    for (int i = 0; i < num_elements; i++)
-    {
-        pressure_data[i] = _lps22hbData[i].pressure;
-    }
-
-    _unread_pressure_data = false;
-}
-
-void Barometer::get_temperature_buffer(float *temp_data, uint8_t num_elements)
-{
-    if (num_elements > FIFO_LENGTH)
-    {
-        LOG_WARNING("Can only return up to %u elements", FIFO_LENGTH);
-        return;
-    }
-
-    for (int i = 0; i < num_elements; i++)
-    {
-        temp_data[i] = _lps22hbData[i].temperature;
-    }
-
-    _unread_temperature_data = false;
-}
-
-bool Barometer::read_buffered_data()
-{
-    if (_barometer.get_fifo(_lps22hbData) == LPS22HB_ERROR)
-    {
-        LOG_WARNING("%s", "Unable to read barometer data");
         return false;
     }
 
-    _unread_pressure_data = true;
-    _unread_temperature_data = true;
-    _bar_data_ready = false;
     return true;
 }
 
-bool Barometer::read_buffered_pressure()
+bool Barometer::set_pressure_threshold(int16_t hPa)
 {
-    if (_barometer.get_pressure_fifo(_pressure_buffer) == LPS22HB_ERROR)
+    if (_barometer.set_interrupt_pressure(hPa) == LPS22HB_ERROR)
     {
-        LOG_WARNING("%s", "Unable to read pressure data from fifo");
         return false;
     }
 
-    _unread_pressure_data = true;
-    _bar_data_ready = true;
     return true;
 }
 
 void Barometer::bar_data_ready()
 {
+    _drdy_timestamp = duration_cast<milliseconds>(_t_barometer.elapsed_time()).count();
+    uint64_t delta_timestamp = _drdy_timestamp - _last_timestamp;
+    _last_timestamp = _drdy_timestamp;
+    
+    float measurement_frequency = 1000 * (float)BAROMETER_FIFO_SIZE / ((float)delta_timestamp);
+    _measurement_frequencyx100 = Utilities::round(measurement_frequency * 100);
+
     _bar_data_ready = true;
 }
 
-// Purgatory
+uint64_t Barometer::get_delta_timestamp(bool broadcast)
+{
+    uint64_t delta_t = _drdy_timestamp - _last_broadcast_timestamp;
+    if (broadcast)
+    {
+        _last_broadcast_timestamp = _drdy_timestamp;
+    }
+    return delta_t;
+}
 
+bool Barometer::read_buffered_data()
+{
+    if (_barometer.get_fifo(_pressure_buffer, _temperature_buffer) == LPS22HB_ERROR)
+    {
+        _logger->log(TRACE_WARNING, "%s", "Unable to read barometer data");
+        return false;
+    }
+
+    if (_pressure_buffer.size() > _max_buffer_size)
+    {
+        uint8_t elements_to_delete = _pressure_buffer.size() - _max_buffer_size;
+        _pressure_buffer.erase(_pressure_buffer.begin(), _pressure_buffer.begin()+elements_to_delete);
+    }
+
+    if (_temperature_buffer.size() > _max_buffer_size)
+    {
+        uint8_t elements_to_delete = _temperature_buffer.size() - _max_buffer_size;
+        _temperature_buffer.erase(_temperature_buffer.begin(), _temperature_buffer.begin()+elements_to_delete);
+    }
+
+    _bar_data_ready = false;
+    return true;
+}
+
+void Barometer::set_max_buffer_size(uint16_t size)
+{
+    _max_buffer_size = size;
+}
+
+/*DINOSAURS
+   *                               *     _
+        /\     *            ___.       /  `)
+    *  //\\    /\          ///\\      / /
+      ///\\\  //\\/\      ////\\\    / /     /\
+     ////\\\\///\\/\\.-~~-.///\\\\  / /     //\\
+    /////\\\\///\\/         `\\\\\\/ /     ///\\
+   //////\\\\// /            `\\\\/ /     ////\\
+  ///////\\\\\//               `~` /\    /////\\
+ ////////\\\\\/      ,_____,   ,-~ \\\__//////\\\
+ ////////\\\\/  /~|  |/////|  |\\\\\\\\@//jro/\\
+ //<           / /|__|/////|__|///////~|~/////\\
+ ~~~     ~~   ` ~   ..   ~  ~    .     ~` `   '.
+ ~ _  -  -~.    .'   .`  ~ .,    '.    ~~ .  '*/
 
     // if (status.FIFO_EMPTY != _last_fifo_empty && status.FIFO_EMPTY)
     // {
-    //     LOG_DEBUG("Fifo Empty! = %u", status.FIFO_LEVEL);
+    //     _logger->log(TRACE_DEBUG, "Fifo Empty! = %u", status.FIFO_LEVEL);
     //     _last_fifo_empty = status.FIFO_EMPTY;
     // }
     // if (status.FIFO_FULL != _last_fifo_full && status.FIFO_FULL)
     // {
-    //     LOG_DEBUG("FIFO full! = %u", status.FIFO_LEVEL);
+    //     _logger->log(TRACE_DEBUG, "FIFO full! = %u", status.FIFO_LEVEL);
     //     _last_fifo_full = status.FIFO_FULL;
     // }
     // if (status.FIFO_OVR != _last_fifo_ovr && status.FIFO_OVR)
     // {
-    //     LOG_DEBUG("FIFO overfull! = %u", status.FIFO_LEVEL);
+    //     _logger->log(TRACE_DEBUG, "FIFO overfull! = %u", status.FIFO_LEVEL);
     //     _last_fifo_ovr = status.FIFO_OVR;
     // }
     // if (status.FIFO_FTH != _last_fifo_fth && status.FIFO_FTH)
     // {
-    //     LOG_DEBUG("FIFO FTH! = %u", status.FIFO_LEVEL)
+    //     _logger->log(TRACE_DEBUG, "FIFO FTH! = %u", status.FIFO_LEVEL)
     //     _last_fifo_fth = status.FIFO_FTH;
     // }
     // if (status.FIFO_LEVEL != _last_fifo_level)
     // {
-    //     LOG_DEBUG("FIFO level = %u", status.FIFO_LEVEL);
+    //     _logger->log(TRACE_DEBUG, "FIFO level = %u", status.FIFO_LEVEL);
     //     _last_fifo_level = status.FIFO_LEVEL;
     // }
 
             // uint8_t mode = 255;
         // _barometer.get_fifo_mode(&mode);
-        // LOG_INFO("fifo mode = %u", mode);
+        // _logger->log(TRACE_INFO, "fifo mode = %u", mode);
 
         // uint8_t enabled = 255;
         // _barometer.get_fifo_enabled(&enabled);
-        // LOG_INFO("fifo enabled = %u", enabled);
+        // _logger->log(TRACE_INFO, "fifo enabled = %u", enabled);

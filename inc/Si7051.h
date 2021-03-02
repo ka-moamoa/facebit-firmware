@@ -33,6 +33,8 @@ THE SOFTWARE.
 #define _CLOSEDCUBE_SI7051_h
 
 #include "mbed.h"
+#include <vector>
+#include "Logger.h"
 
 #define SI7051_ADDRESS (0x40 << 1)
 
@@ -54,15 +56,35 @@ public:
 
 	void initialize();
 	void setResolution(uint8_t resolution);
+	
+	void setFrequency(uint8_t frequency_Hz) { _measurement_frequency_hz = frequency_Hz; };
+	uint32_t getFrequencyx100();
 
 	void reset();
 
 	uint8_t readFirmwareVersion();
 
 	float readTemperature();
+	void update();
+	bool getBufferFull() { return _tempx100_array.size() >= MAX_BUFFER_SIZE; };
+	void clearBuffer() { _tempx100_array.clear(); };
+	uint8_t getBufferSize() { return _tempx100_array.size(); };
+	uint16_t* getBuffer() { return _tempx100_array.data(); };
+	uint64_t getDeltaTimestamp(bool broadcast);
+	uint8_t getMeasurementFrequency(){ return _measurement_frequency_hz;}
 private:
 	uint8_t _address;
 	I2C *_i2c;
+	std::vector<uint16_t> _tempx100_array;
+	uint8_t _measurement_frequency_hz = 10; // Hz
+	LowPowerTimer _frequency_timer;
+	LowPowerTimer _timer;
+	uint64_t _relative_measurement_timestamp = 0;
+	uint64_t _last_measurement_timestamp = 0;
+	uint64_t _last_broadcast_timestamp = 0;
+	uint32_t _actual_frequencyx100 = 0;
+
+	Logger* _logger;
 
 	const char MEASURE_HOLD = 0xE3;
 	const char MEASURE_NOHOLD = 0xF3;
@@ -77,6 +99,8 @@ private:
 	const char READ = 0x01;
 	
 	const uint8_t MEASUREMENT_TIMEOUT_MS = 20; 
+
+	const uint8_t MAX_BUFFER_SIZE = 50;
 };
 
 #endif

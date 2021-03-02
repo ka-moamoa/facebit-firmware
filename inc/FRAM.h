@@ -3,7 +3,7 @@
 
 #include "mbed.h"
 #include "SPI.h"
-
+#include "Logger.h"
 class FRAM
 {
 private:
@@ -33,6 +33,8 @@ private:
 public:
     FRAM(SPI *spi, PinName fram_cs);
     ~FRAM();
+
+    Logger* _logger;
 
     void initialize();
 

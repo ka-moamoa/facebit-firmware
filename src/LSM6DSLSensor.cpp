@@ -266,6 +266,66 @@ int LSM6DSLSensor::read_id(uint8_t *id)
  * @param  pData the pointer where the accelerometer data are stored
  * @retval 0 in case of success, an error code otherwise
  */
+int LSM6DSLSensor::get_x_axes_f(float *pData)
+{
+  int16_t dataRaw[3];
+  float sensitivity = 0;
+  
+  /* Read raw data from LSM6DSL output register. */
+  if ( get_x_axes_raw( dataRaw ) == 1 )
+  {
+    return 1;
+  }
+  
+  /* Get LSM6DSL actual sensitivity. */
+  if ( get_x_sensitivity( &sensitivity ) == 1 )
+  {
+    return 1;
+  }
+  
+  /* Calculate the data. */
+  pData[0] = (float)dataRaw[0] * sensitivity;
+  pData[1] = (float)dataRaw[1] * sensitivity;
+  pData[2] = (float)dataRaw[2] * sensitivity;
+  
+  return 0;
+}
+
+/**
+ * @brief  Read data from LSM6DSL Gyroscope
+ * @param  pData the pointer where the gyroscope data are stored
+ * @retval 0 in case of success, an error code otherwise
+ */
+int LSM6DSLSensor::get_g_axes_f(float *pData)
+{
+  int16_t dataRaw[3];
+  float sensitivity = 0;
+  
+  /* Read raw data from LSM6DSL output register. */
+  if ( get_g_axes_raw( dataRaw ) == 1 )
+  {
+    return 1;
+  }
+  
+  /* Get LSM6DSL actual sensitivity. */
+  if ( get_g_sensitivity( &sensitivity ) == 1 )
+  {
+    return 1;
+  }
+  
+  /* Calculate the data. */
+  pData[0] = (float)dataRaw[0] * sensitivity;
+  pData[1] = (float)dataRaw[1] * sensitivity;
+  pData[2] = (float)dataRaw[2] * sensitivity;
+  
+  return 0;
+}
+
+/**
+ * @brief  Read data from LSM6DSL Accelerometer
+ * @param  pData the pointer where the accelerometer data are stored
+ * @retval 0 in case of success, an error code otherwise
+ */
 int LSM6DSLSensor::get_x_axes(int32_t *pData)
 {
   int16_t dataRaw[3];
@@ -861,6 +921,16 @@ int LSM6DSLSensor::set_g_fs(float fullScale)
     }
   }
   
+  return 0;
+}
+
+int LSM6DSLSensor::enable_int1_drdy_g(void)
+{
+  if (LSM6DSL_ACC_GYRO_W_DRDY_G_on_INT1( (void *)this, LSM6DSL_ACC_GYRO_INT1_DRDY_G_ENABLED) == MEMS_ERROR)
+  {
+    return 1;
+  }
+
   return 0;
 }
 

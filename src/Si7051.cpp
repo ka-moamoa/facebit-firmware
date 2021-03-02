@@ -32,28 +32,39 @@ THE SOFTWARE.
 #include "Si7051.h"
 #include "LowPowerTimer.h"
 #include "I2C.h"
-#include "SWOLogger.h"
+#include "Logger.h"
+#include "Utilites.h"
 
 Si7051::Si7051(I2C *i2c, char address)
 {
+	_logger = Logger::get_instance();
 	_i2c = i2c;
 	_address = address;
 }
 
 void Si7051::initialize() {
-	setResolution(14);
+	setResolution(12);
+
+	_frequency_timer.reset();
+	_frequency_timer.start();
+
+	_timer.reset();
+	_timer.start();
 }
 
 void Si7051::reset()
 {
 	_i2c->start();
 	bool ack = _i2c->write(_address | WRITE);
-	if (!ack) { LOG_WARNING("%s", "nack reset address stage") };
+	if (!ack) { _logger->log(TRACE_WARNING, "nack reset address stage"); };
 	
 	ack = _i2c->write(RESET);
-	if (!ack) { LOG_WARNING("%s", "nack reset cmd stage") };
+	if (!ack) { _logger->log(TRACE_WARNING, "nack reset cmd stage"); };
 
 	_i2c->stop();
+
+	_timer.reset();
+	_timer.start();
 }
 
 uint8_t Si7051::readFirmwareVersion()
@@ -61,13 +72,13 @@ uint8_t Si7051::readFirmwareVersion()
 	_i2c->start();
 
 	bool ack = _i2c->write(_address | WRITE); // write command
-	if (!ack) { LOG_WARNING("%s", "nack fw address stage") };
+	if (!ack) { _logger->log(TRACE_WARNING, "nack fw address stage"); };
 	
 	ack = _i2c->write(READ_FW_REV[0]);
-	if (!ack) { LOG_WARNING("%s", "nack fw cmd1 stage") };
+	if (!ack) { _logger->log(TRACE_WARNING, "nack fw cmd1 stage"); };
 
 	ack = _i2c->write(READ_FW_REV[1]);
-	if (!ack) { LOG_WARNING("%s", "nack fw cmd2 stage") };
+	if (!ack) { _logger->log(TRACE_WARNING, "nack fw cmd2 stage"); };
 
 	_i2c->start();
 	_i2c->write(_address | READ);
@@ -102,10 +113,10 @@ void Si7051::setResolution(uint8_t resolution)
 	_i2c->start();
 
 	bool ack = _i2c->write(_address | WRITE);
-	if (!ack) { LOG_WARNING("%s", "nack set res address stage") };
+	if (!ack) { _logger->log(TRACE_WARNING, "nack set res address stage"); };
 
 	ack = _i2c->write(WRITE_UR);
-	if (!ack) { LOG_WARNING("%s", "nack set res cmd stage") };
+	if (!ack) { _logger->log(TRACE_WARNING, "nack set res cmd stage"); };
 
 	ack = _i2c->write(reg.rawData);
 	_i2c->read(true); // this is to "ack" the write
@@ -118,10 +129,10 @@ float Si7051::readTemperature()
 	_i2c->start();
 
 	bool ack = _i2c->write(_address | WRITE);
-	if (!ack) { LOG_WARNING("%s", "nack address stage") };
+	if (!ack) { _logger->log(TRACE_WARNING, "nack address stage"); };
 
 	ack = _i2c->write(MEASURE_NOHOLD);
-	if (!ack) { LOG_WARNING("%s", "nack measure cmd stage") };
+	if (!ack) { _logger->log(TRACE_WARNING, "nack measure cmd stage"); };
 
 	LowPowerTimer timeout;
 	timeout.start();
@@ -134,12 +145,12 @@ float Si7051::readTemperature()
 		ThisThread::sleep_for(4ms);
 		_i2c->start();
 		ack = _i2c->write(_address | READ);
-		if (!ack) { LOG_DEBUG("nack from temp sensor. waiting... %lli ms", std::chrono::duration_cast<std::chrono::milliseconds>(timeout.elapsed_time()).count()); }
+		if (!ack) { _logger->log(TRACE_DEBUG, "nack from temp sensor. waiting... %lli ms", std::chrono::duration_cast<std::chrono::milliseconds>(timeout.elapsed_time()).count()); }
 	}
 	timeout.stop();
 	if (ack == false)
 	{
-		LOG_WARNING("%s", "Temp sensor timeout without response");
+		_logger->log(TRACE_WARNING, "Temp sensor timeout without response");
 		return -999.999;
 	}
 	
@@ -152,5 +163,44 @@ float Si7051::readTemperature()
 	uint16_t val = msb << 8 | lsb;
 
 	return (175.72*val) / 65536 - 46.85;
+}
+
+void Si7051::update()
+{
+	float measurement_period = 1.0 / (float)_measurement_frequency_hz;
+
+	if (_frequency_timer.read() >= measurement_period)
+	{
+		float tempVal = readTemperature();
+		uint16_t tempValx100 = (uint16_t)Utilities::round(tempVal * 100.0);
+		_tempx100_array.push_back(tempValx100);
+
+		if (_tempx100_array.size() > MAX_BUFFER_SIZE)
+		{
+			_tempx100_array.erase(_tempx100_array.begin());
+		}
+
+		_relative_measurement_timestamp = _frequency_timer.read_ms();
+		_last_measurement_timestamp = _timer.read_ms();
+		_frequency_timer.reset();
+	}
+}
+
+uint64_t Si7051::getDeltaTimestamp(bool broadcast)
+{
+	uint64_t delta_t = _last_measurement_timestamp - _last_broadcast_timestamp;
+	if (broadcast)
+	{
+		float actual_frequency = 1000.0 * (float)getBufferSize() / (float) delta_t;
+		_actual_frequencyx100 = Utilities::round(actual_frequency * 100.0);
+		_last_broadcast_timestamp = _last_measurement_timestamp;
+	}
+
+	return delta_t;
+}
+
+uint32_t Si7051::getFrequencyx100()
+{
+	return _actual_frequencyx100;
 }
 

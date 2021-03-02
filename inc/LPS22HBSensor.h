@@ -49,7 +49,7 @@
 #include "PressureSensor.h"
 #include "TempSensor.h"
 #include <assert.h>
-
+#include <queue>
 
 #define FIFO_LENGTH (uint8_t)32
 /* Data Types -------------------------------------------------------------*/
@@ -62,8 +62,8 @@
 */
 typedef struct
 {
-  float temperature;
-  float pressure;
+  uint32_t temperature;
+  uint32_t pressure;
 }LPS22HB_Data_st;
 
 /**
@@ -96,7 +96,7 @@ class LPS22HBSensor : public PressureSensor, public TempSensor
     int sw_reset(void);
     int enable_fifo(void);
     int get_fifo_enabled(uint8_t *enabled);
-    int enable_fifo_full_interrupt(void);
+    int fifo_full_interrupt(bool enable);
     int set_interrupt_level(uint8_t intr);
     int enable_fifo_watermark(void);
     int set_fifo_watermark(uint8_t level);
@@ -105,9 +105,12 @@ class LPS22HBSensor : public PressureSensor, public TempSensor
     int set_fifo_mode(uint8_t mode);
     int get_fifo_mode(uint8_t *mode);
     int get_fifo_status(LPS22HB_FifoStatus_st *status);
-    int get_fifo(LPS22HB_Data_st *data);
+    int get_fifo(std::vector<uint16_t> &pressure_buffer, std::vector<uint16_t> &temperature_buffer);
     int get_pressure_fifo(float *pfData);
     int get_temperature_fifo(float *pfData);
+    int differential_interrupt(bool enable, bool high_pressure, bool low_pressure);
+    int set_interrupt_pressure(int16_t hPa);
+    int get_interrupt_status(LPS22HB_InterruptDiffStatus_st *int_source);
     /**
      * @brief Utility function to read data.
      * @param  pBuffer: pointer to data to be read.

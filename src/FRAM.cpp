@@ -1,6 +1,5 @@
 #include "FRAM.h"
 #include "rtos.h"
-#include "SWOLogger.h"
 
 // https://www.cypress.com/documentation/application-notes/an304-spi-guide-f-ram
 
@@ -8,6 +7,7 @@
 FRAM::FRAM(SPI *spi, PinName fram_cs) :
 _fram_cs(fram_cs)
 {
+    _logger = Logger::get_instance();
     _spi = spi;
     _fram_cs = 1;
 }
@@ -25,7 +25,7 @@ bool FRAM::write_bytes(uint32_t address, const char *tx_buffer, int tx_bytes)
 {
     if (address > MAX_ADDRESS)
     {
-        LOG_WARNING("%s", "SPI address is too large!");
+        _logger->log(TRACE_WARNING, "%s", "SPI address is too large!");
         return false;
     }
 
@@ -51,7 +51,7 @@ uint8_t FRAM::read_bytes(uint32_t address, char *rx_buffer, int rx_bytes)
 {
     if (address > MAX_ADDRESS)
     {
-        LOG_WARNING("%s", "SPI address is too large!");
+        _logger->log(TRACE_WARNING, "%s", "SPI address is too large!");
         return false;
     }
 
