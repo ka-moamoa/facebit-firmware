@@ -14,11 +14,13 @@
 
     [Overview - Build tools | Mbed OS 6 Documentation](https://os.mbed.com/docs/mbed-os/v6.3/build-tools/index.html)
 
-4. GNU Arm Embedded Toolchain (this is a dependency of mbed cli, but putting the download page here for convenience). Make sure to either put this on your path, or point mbed to the directory.
+4. GNU Arm Embedded Toolchain (this is a dependency of mbed cli, but putting the download page here for convenience). Make sure to either put this on your path, or point mbed to the directory. You'll need this path later on as well.
 
     [GNU Toolchain | GNU Arm Embedded Toolchain Downloads - Arm Developer](https://developer.arm.com/tools-and-software/open-source-software/developer-tools/gnu-toolchain/gnu-rm/downloads)
 
-5. Required Hardware:
+5. [JLink Software and Documentation Pack](https://www.segger.com/downloads/jlink/#J-LinkSoftwareAndDocumentationPack). Keep track of where this is installed, you'll need the path later on.
+
+6. Required Hardware:
     - Smart PPE board
     - JLINK debugger (e.g. [J-Link EDU Mini](https://www.adafruit.com/product/3571?gclid=EAIaIQobChMIqeXO9fvS7QIVEI3ICh3I5g0TEAQYAiABEgJDwvD_BwE), which we have a lot of in the lab). Note that you can also use a Nordic (or I think even ST) development kit in a pinch, but the dedicated J-Link will be faster.
     - Micro USB Cable
@@ -47,45 +49,127 @@ Here we get up and running with the base project. This ensures we're all able to
     ```
 
 4. I'm not sure if this step is required for Windows computer (or other Mac users, for that matter), but the first time I set this up I had to cd into the `mbed-os` directory and run `pip install -r requirements.txt --user`. I think the `--user` flag should only apply to Macs. `cd ..` back out into the root of the project if you do this.
-5. Now you should be able to run `mbed compile -t GCC_ARM -m SMARTPPE` and watch as your computer compiles the code!
+
+5. Go to the [bluetooth features snippets page](https://gitlab.com/ka-moamoa/smart-ppe/embedded-firmware/-/snippets/2069498), and copy-paste the contents over the contents of the file at this location: `embedded-firmware/mbed-os/connectivity/FEATURE_BLE/mbed_lib.json`. Eventually we may want to just make our own fork of the mbed repo, but for now we're doing it this way :)
+
+6. Now you should be able to run `mbed compile -t GCC_ARM -m SMARTPPE` and watch as your computer compiles the code!
 
 ## Visual Studio Code Setup
 
-1. IF you're using VS Code, first open up the folder `embedded firmware` in VS Code. On Windows you can do this by right clicking in the folder and selecting "Open in VS Code" (if you enabled that option) and on Mac you can do it by dragging the folder to the icon. There are other ways to do this too (like typing `code .` in your terminal program), but you may have to set them up. Read the docs if interested.
+1. If you're using VS Code, first open up the folder `embedded firmware` in VS Code. On Windows you can do this by right clicking in the folder and selecting "Open in VS Code" (if you enabled that option) and on Mac you can do it by dragging the folder to the icon. There are other ways to do this too (like typing `code .` in your terminal program), but you may have to set them up. Read the docs if interested.
 2. Then hit `F1` to bring up the command palette. Start typing `configure default build task`, then select it from the list. It will give you some default options, hit `other`. Paste this into the `tasks.json` file that pops up:
 
-    ```json
-    {
-        // See https://go.microsoft.com/fwlink/?LinkId=733558
-        // for the documentation about the tasks.json format
-        "version": "2.0.0",
-        "tasks": [
-            {
-                "label": "build-debug",
-                "type": "shell",
-                "command": "mbed compile -t GCC_ARM -m SMARTPPE --profile mbed-os/tools/profiles/debug.json",
-                "problemMatcher": "$gcc",
-                "group": {
-                    "kind": "build",
-                    "isDefault": true
-                }
-            },
-            {
-                "label": "build",
-                "type": "shell",
-                "command": "mbed compile -t GCC_ARM -m SMARTPPE",
-                "problemMatcher": "$gcc",
-                "group": "build"
+```json
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "tasks": 
+    [
+        {
+            "label": "build-debug",
+            "type": "shell",
+            "command": "mbed compile -t GCC_ARM -m SMARTPPE --profile debug",
+            "problemMatcher": "$gcc",
+            "group": {
+                "kind": "build",
+                "isDefault": true
             }
-        ]
-    }
-    ```
+        },
+        {
+            "label": "build-develop",
+            "type": "shell",
+            "command": "mbed compile -t GCC_ARM -m SMARTPPE --profile develop",
+            "problemMatcher": "$gcc",
+            "group": "build"
+        }
+    ]
+}
+```
 
 3. Now you can build right in vscode. You can kick it off by pressing `F1` then `Tasks: Run Build Task`, or you can kick it off with a key command (I think the default is cmd-shift-B on mac and ctrl-shift-b on windows, but you can change this). Key commands are the way to go IMO.
 
-## Flashing and Debugging The Board with Ozone (Recommended)
+## Debugging The Board (VSCode)
 
-Unfortunately in my experience the best debugger for Nordic chips (Ozone) is not the same as the best coding environment for Nordic chips (VSCode). That means that I usually code and build in VSCode, and then switch to Ozone when it's time to debug. Thankfully, Ozone makes this process relatively painless. Here's how to set it up:
+Hit the "Run" button on your sidebar  
+![](.readme-images/2020-09-25-15-29-00.png)  
+and select "create a launch.json file". Choose any of the options (you'll delete the default configuration it adds).
+
+Copy/paste this over the launch.json file that is generated:
+
+```json
+{
+    "version": "0.2.0",
+    "configurations": 
+    [
+        {
+            "name": "debug",
+            "type": "cortex-debug",
+            "request": "launch",
+            "servertype": "jlink",
+            "serverpath": "/Applications/SEGGER/JLink_V692/JLinkGDBServerCLExe",
+            "interface": "swd",
+            "cwd": "${workspaceRoot}",
+            "runToMain": true,
+            "executable": "${workspaceRoot}/BUILD/SMARTPPE/GCC_ARM-DEBUG/${workspaceRootFolderName}.elf",
+            "device": "nrf52",
+            "svdFile": "${workspaceRoot}/nrf52.svd",
+            "armToolchainPath": "/Applications/ARM/bin/",
+            "swoConfig": {
+                "enabled": true,
+                "cpuFrequency": 64000000,
+                "swoFrequency": 40000000,
+                "source": "probe",
+                "decoders": [
+                    {
+                        "type": "console",
+                        "label": "SMART-PPE",
+                        "port": 0
+                    }
+                ]
+            }
+        },
+        {
+            "name": "debug-develop",
+            "type": "cortex-debug",
+            "request": "launch",
+            "servertype": "jlink",
+            "serverpath": "/Applications/SEGGER/JLink_V692/JLinkGDBServerCLExe",
+            "interface": "swd",
+            "cwd": "${workspaceRoot}",
+            "runToMain": true,
+            "executable": "${workspaceRoot}/BUILD/SMARTPPE/GCC_ARM-DEVELOP/${workspaceRootFolderName}.elf",
+            "device": "nrf52",
+            "svdFile": "${workspaceRoot}/nrf52.svd",
+            "armToolchainPath": "/Applications/ARM/bin/",
+            "swoConfig": {
+                "enabled": true,
+                "cpuFrequency": 64000000,
+                "swoFrequency": 40000000,
+                "source": "probe",
+                "decoders": [
+                    {
+                        "type": "console",
+                        "label": "SMART-PPE",
+                        "port": 0
+                    }
+                ]
+            }
+        }
+    ]
+}
+```
+
+Again, you may have to adjust some file paths. Particularly `serverpath`, `executable`, and `armToolchainPath`. 
+
+Save, and now you should be able to debug your board from within VS Code by hitting the "run" button, and clicking the green arrow at the top of the panel. (Or, as with all things, you can set up a keyboard shortcut to do this, by default it's F5 on mac).
+
+To get SWO output, after VSCode has downloaded the code to your board and is waiting for you to hit "start", go to `Output` in the bottom pane, and where it says `Tasks` in the upper right, switch to `SWO: SMART-PPE`
+![](.readme-images/SelectSWO.png) 
+
+## Flashing and Debugging The Board with Ozone
+
+Sometimes VSCode's debugging is buggy or doesn't work for something specific. When that happens I usually code and build in VSCode, and then switch to Ozone when it's time to debug. Thankfully, Ozone makes this process relatively painless. Here's how to set it up:
 
 1. Plug in the J-Link (or dev kit) to your computer via USB, connect the ribbon cable to the smart ppe board's debug header. The red wire on the ribbon should be on the side of the J-Link marked with a (1). ![](.readme-images/j-link.jpeg)
 2. Download [Ozone](https://www.segger.com/products/development-tools/ozone-j-link-debugger/#download-installation)
@@ -108,79 +192,4 @@ Unfortunately in my experience the best debugger for Nordic chips (Ozone) is not
 12. Random tips:
     - You can find a source file by clicking into the `Source Files` window and begin typing the name of the source file. It will search for and show the file. Handy if you want to set breakpoints in a given file.
     - Same goes for the `Registers` window. Expand the bank you're interested in (likely Peripherals with 1708 registers, which we get from the nrf52.svd file), and then begin typing the name of the register you're interested in. 
-
-## Flashing The Board (VSCode)
-
-You have to download the [nrf command line tools](https://www.nordicsemi.com/Software-and-tools/Development-Tools/nRF-Command-Line-Tools/Download#infotabs) for this part (and the next part). Make sure they are added to your path variable.
-
-Add this task to your `tasks.json` file:
-
-```json
-        {
-            "label": "flash",
-            "type": "shell",
-            "command": "mbed compile -t GCC_ARM -m SMARTPPE && nrfjprog -f nrf52 --eraseall && nrfjprog -f nrf52 --program \"${workspaceRoot}/BUILD/SMARTPPE/GCC_ARM/${workspaceRootFolderName}.hex\" && nrfjprog -f nrf52 --reset",
-            "problemMatcher": []
-        }
-```
-A note on these ^, the `command` argument has to point to *your* executable. After the `nrf52 --program` argument, you may have to modify the path if your computer doesn't build the files to the location I've specified here. I think it should, but it may depend on something computer-dependent.
-
-Once that's in there, you should be able to hit `F1`->`Tasks: Run Task`->`flash`, and compile/flash the program to your board!
-
-## Debugging The Board (VSCode)
-
-Make sure you have the [nrf command line tools](https://www.nordicsemi.com/Software-and-tools/Development-Tools/nRF-Command-Line-Tools/Download#infotabs) I talked about in the last section (and on your path!)
-
-Add this task to your `tasks.json` file:
-
-```json
-        {
-            "label": "flash-debug",
-            "type": "shell",
-            "command": "mbed compile -t GCC_ARM -m SMARTPPE --profile mbed-os/tools/profiles/debug.json && nrfjprog -f nrf52 --eraseall && nrfjprog -f nrf52 --program \"${workspaceRoot}/BUILD/SMARTPPE/GCC_ARM-DEBUG/${workspaceRootFolderName}.hex\" && nrfjprog -f nrf52 --reset",
-            "problemMatcher": "$gcc"
-        }
-```
-
-This is a modified version of the `flash` task you added in the last section. It compiles and flashes a "debuggable" (non-optimized) version of the code using the `--profile mbed-os/tools/profiles/debug.json` argument.
-
-Now, hit the "Run" button on your sidebar  
-![](.readme-images/2020-09-25-15-29-00.png)  
-and select "create a launch.json file". Choose any of the options (you'll delete the default configuration it adds).
-
-Copy/paste this over the launch.json file that is generated:
-
-```json
-{
-    "version": "0.2.0",
-    "configurations": [
-        {
-            "name": "Cortex - JLINK",
-            "type": "cortex-debug",
-            "request": "launch",
-            "servertype": "jlink",
-            "serverpath": "/Applications/SEGGER/JLink_V692/JLinkGDBServerCLExe", 
-            "interface": "swd",
-            "cwd": "${workspaceRoot}",
-            "preLaunchTask": "flash-debug",
-            "runToMain": true,
-            "executable": "${workspaceRoot}/BUILD/SMARTPPE/GCC_ARM-DEBUG/${workspaceRootFolderName}.elf",
-            "device": "nrf52",
-            "svdFile": "${workspaceRoot}/nrf52.svd",
-            "armToolchainPath": "/Applications/ARM/bin/",
-            "swoConfig": {
-                "enabled": true,
-                "cpuFrequency": 64000000,
-                "swoFrequency": 8000000,
-                "source": "probe",
-                "decoders": [
-                    { "type": "console", "label": "SMART-PPE", "port": 0 }
-                ]
-            }
-        }
-    ]
-}
-```
-
-Save, and now you should be able to debug your board from within VS Code by hitting the "run" button, and clicking the green arrow at the top of the panel. (Or, as with all things, you can set up a keyboard shortcut to do this, by default it's F5 on mac).
 
