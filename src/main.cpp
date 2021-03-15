@@ -11,8 +11,8 @@
 #include "CapCalc.h"
 #include "FaceBitState.hpp"
 
-#define FACEBIT_UART
-#define TRACE_LEVEL TRACE_DEBUG
+#define FACEBIT_SWO
+#define TRACE_LEVEL TRACE_TRACE
 
 // #include "mbed_mem_trace.h"
 
@@ -39,7 +39,7 @@ void blink()
 {
     while(1)
     {
-        BusControl::get_instance()->blink_led();
+        BusControl::get_instance()->blink_led(10ms);
         ThisThread::sleep_for(2s);
     }
 }
@@ -55,7 +55,7 @@ int main() {
     _logger = Logger::get_instance();
 
 #if defined(FACEBIT_SWO)
-    _logger_initialize(&swo, TRACE_LEVEL);
+    _logger->initialize(&swo, TRACE_LEVEL);
 #elif defined(FACEBIT_UART)
     _logger->initialize(&serial, TRACE_LEVEL);
 #endif

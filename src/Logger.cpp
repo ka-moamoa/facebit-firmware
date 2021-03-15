@@ -43,7 +43,6 @@ void Logger::initialize(UnbufferedSerial* serial, trace_level_t trace_level)
 void Logger::initialize(SWO_Channel* swo, trace_level_t trace_level)
 {
     _swo = swo;
-    _swo->claim();
 
     _trace_level = trace_level;
 
@@ -54,7 +53,7 @@ void Logger::initialize(SWO_Channel* swo, trace_level_t trace_level)
 
 void Logger::log(trace_level_t level, const char *msg, ...)
 {
-    if (_trace_level < level) return;
+    if (level < _trace_level) return;
     else if (!_initialized) return;
 
     va_list args;

@@ -5,6 +5,8 @@
 #include "Mutex.h"
 #include "Logger.h"
 
+using namespace std::chrono;
+
 class BusControl
 {
 public:
@@ -29,7 +31,7 @@ public:
     void spi_power(bool power);
     void i2c_power(bool power);
     
-    void blink_led();
+    void blink_led(milliseconds length);
 
     bool get_spi_power();
     bool get_i2c_power();

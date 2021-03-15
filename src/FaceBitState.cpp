@@ -318,7 +318,7 @@ bool FaceBitState::_sync_data(GattServerProcess *_ble_process)
     {
         Thread::State state = _ble_thread.get_state();
         uint16_t size = _ble_process->event_queue_size;
-        _logger->log(TRACE_TRACE, "Thread state = %u, equeue size = %u", state, size);
+        // _logger->log(TRACE_TRACE, "Thread state = %u, equeue size = %u", state, size);
         
         if (ble_timeout.read_ms() > BLE_CONNECTION_TIMEOUT)
         {

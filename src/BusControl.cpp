@@ -138,10 +138,10 @@ void BusControl::i2c_power(bool power)
     _i2c_power = power;
 }
 
-void BusControl::blink_led()
+void BusControl::blink_led(milliseconds length)
 {
     _led = 1;
-    ThisThread::sleep_for(10ms);
+    ThisThread::sleep_for(length);
     _led = 0;
 }
 

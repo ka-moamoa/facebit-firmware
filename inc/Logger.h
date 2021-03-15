@@ -35,7 +35,7 @@ private:
     static Logger* _instance;
     UnbufferedSerial* _serial = nullptr;
     SWO_Channel* _swo = nullptr;
-    trace_level_t _trace_level = TRACE_DEBUG;
+    trace_level_t _trace_level = TRACE_TRACE;
     const char _trace_char[TRACE_LAST] = {'T', 'D', 'I', 'W'};
     bool _uart = false;
     bool _initialized = false;
