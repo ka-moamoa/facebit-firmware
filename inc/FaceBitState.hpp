@@ -88,8 +88,8 @@ private:
     // const uint32_t MASK_FIT_PERIOD = 5000;//1 * 60 * 1000; // 1 min
     const uint32_t BLE_BROADCAST_PERIOD = 60000;//5 * 60 * 1000; // 5 min
 
-    const uint32_t BLE_CONNECTION_TIMEOUT = 15000;
-    const uint32_t BLE_DRDY_TIMEOUT = 15000;
+    const uint32_t BLE_CONNECTION_TIMEOUT = 5000;
+    const uint32_t BLE_DRDY_TIMEOUT = 5000;
 
     uint32_t ACTIVE_STATE_ENTRY_TS = 0;
 
