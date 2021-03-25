@@ -142,7 +142,7 @@ float Si7051::readTemperature()
 	// the workaround is to sleep_for > 4 ms or so (probably 10 is safer), to just give it time to finish the measurement.
 	while (ack == false && std::chrono::duration_cast<std::chrono::milliseconds>(timeout.elapsed_time()).count() < MEASUREMENT_TIMEOUT_MS) // the device will nack read requests until the measurement is ready
 	{
-		ThisThread::sleep_for(4ms);
+		ThisThread::sleep_for(10ms);
 		_i2c->start();
 		ack = _i2c->write(_address | READ);
 		if (!ack) { _logger->log(TRACE_DEBUG, "nack from temp sensor. waiting... %lli ms", std::chrono::duration_cast<std::chrono::milliseconds>(timeout.elapsed_time()).count()); }
@@ -165,7 +165,7 @@ float Si7051::readTemperature()
 	return (175.72*val) / 65536 - 46.85;
 }
 
-void Si7051::update()
+bool Si7051::update()
 {
 	float measurement_period = 1.0 / (float)_measurement_frequency_hz;
 
@@ -183,7 +183,10 @@ void Si7051::update()
 		_relative_measurement_timestamp = _frequency_timer.read_ms();
 		_last_measurement_timestamp = _timer.read_ms();
 		_frequency_timer.reset();
+		return true;
 	}
+	
+	return false;
 }
 
 uint64_t Si7051::getDeltaTimestamp(bool broadcast)

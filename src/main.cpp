@@ -37,6 +37,7 @@ FileHandle *mbed::mbed_override_console(int fd)
 
 void blink()
 {
+    BusControl::get_instance()->set_led_blinks(1);
     while(1)
     {
         BusControl::get_instance()->blink_led(10ms);

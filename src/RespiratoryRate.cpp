@@ -5,6 +5,7 @@ RespiratoryRate::RespiratoryRate(CapCalc *cap, Si7051 &temp) : _cap(cap),
                                                                _temp(temp)
 {
     _bus_control = BusControl::get_instance();
+    _logger = Logger::get_instance();
 }
 
 RespiratoryRate::~RespiratoryRate()
@@ -90,7 +91,6 @@ bool RespiratoryRate::get_resp_rate()
 {
     bool new_resp_rate = false;
 
-    printf("Resp Sensing\n\r");
     // if ((_cap->calc_joules() > SENSING_ENERGY && _cap.read_voltage() > MIN_VOLTAGE))
     {
         _bus_control->i2c_power(true);
@@ -105,13 +105,20 @@ bool RespiratoryRate::get_resp_rate()
         for (int i = 0; i < SAMPLE_SIZE;)
         {
             _temp.update();
-            while (!_temp.getBufferFull())
-                _temp.update();
+            while (_temp.getBufferSize() < SAMPLE_SIZE)
+            {
+                ThisThread::sleep_for(90ms);
+                while(!_temp.update())
+                {
+                    ThisThread::sleep_for(1ms);
+                }
+            }
+
+            _bus_control->i2c_power(false);
 
             uint16_t *buffer = _temp.getBuffer();
             for (int j = 0; j < _temp.getBufferSize(); j++)
             {
-                //printf("Data %d\r\n", buffer[j]);
                 samples[i] = (buffer[j] / 100.0);
                 sum = sum + samples[i];
                 i++;

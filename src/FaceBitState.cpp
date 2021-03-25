@@ -51,6 +51,7 @@ void FaceBitState::run()
         uint32_t ts = state_timer.read_ms();
 
         update_state(ts);
+        _bus_control->set_led_blinks((uint8_t)_mask_state + 1);
         
         if (ts - _last_ble_ts > BLE_BROADCAST_PERIOD)
         {
@@ -123,7 +124,7 @@ void FaceBitState::update_state(uint32_t ts)
             if (mask_status == MaskStateDetection::ON)
             {
                 _logger->log(TRACE_INFO, "%s", "MASK ON");
-                _next_mask_state = ON_FACE;
+            _next_mask_state = ON_FACE;
             }
             else if (mask_status == MaskStateDetection::OFF)
             {
@@ -142,10 +143,9 @@ void FaceBitState::update_state(uint32_t ts)
 
             break;
         }
-        
         case ON_FACE:
         {
-        _sleep_duration = ON_FACE_SLEEP_DURATION;
+            _sleep_duration = ON_FACE_SLEEP_DURATION;
 
             switch(_task_state)
             {
@@ -172,23 +172,30 @@ void FaceBitState::update_state(uint32_t ts)
                     Si7051 temp(&_i2c);
                     RespiratoryRate resp_rate(cap, temp);
 
+                    _logger->log(TRACE_INFO, "RESP RATE MEASUREMENT");
+
                     _last_rr_ts = ts;
 
                     if(resp_rate.get_resp_rate())
                     {
-                        RespiratoryRate::RR_t rr;
                         if (resp_rate.get_buffer_size())
                         {
-                            rr = resp_rate.get_buffer_element();
+                            _logger->log(TRACE_INFO, "Respiration rate success");
+
+                            RespiratoryRate::RR_t rr = resp_rate.get_buffer_element();
+
+                            FaceBitData rr_data;
+                            rr_data.data_type = RESPIRATORY_RATE;
+                            rr_data.timestamp = rr.timestamp;
+                            rr_data.value = rr.rate;
+
+                            data_buffer.push_back(rr_data);
                         }
 
-                        FaceBitData rr_data;
-                        rr_data.data_type = RESPIRATORY_RATE;
-                        rr_data.timestamp = rr.timestamp;
-                        rr_data.value = rr.rate;
-
-                        data_buffer.push_back(rr_data);
-
+                    }
+                    else
+                    {
+                        _logger->log(TRACE_INFO, "Respiration rate failure");
                     }
 
                     _next_task_state = IDLE;

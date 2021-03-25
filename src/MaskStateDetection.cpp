@@ -35,6 +35,7 @@ MaskStateDetection::MASK_STATE_t MaskStateDetection::is_on()
     while(timer.read() < DETECTION_WINDOW + 1) // timeout so we don't get stuck
     {
         _bus_control->spi_power(true);
+
         ThisThread::sleep_for(10ms);
 
         _barometer->update();
@@ -58,11 +59,14 @@ MaskStateDetection::MASK_STATE_t MaskStateDetection::is_on()
             uint16_t diff = abs(max - min);
             _logger->log(TRACE_TRACE, "max/min diff = %u", diff);
 
+            _bus_control->set_power_lock(BusControl::BAROMETER, false);
+            _bus_control->spi_power(false);
+
             if (diff > ON_THRESHOLD) return ON;
             else return OFF;
         }
-        
-        ThisThread::sleep_for(200ms);
+        uint16_t sleep_time = 32.0 / (float)_barometer->BAROMETER_FREQUENCY * 1000 + 10;
+        ThisThread::sleep_for(sleep_time);
     }
 
     return ERROR; // shouldn't end up here, unless barometer stops responding

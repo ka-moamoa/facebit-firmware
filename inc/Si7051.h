@@ -65,7 +65,7 @@ public:
 	uint8_t readFirmwareVersion();
 
 	float readTemperature();
-	void update();
+	bool update();
 	bool getBufferFull() { return _tempx100_array.size() >= MAX_BUFFER_SIZE; };
 	void clearBuffer() { _tempx100_array.clear(); };
 	uint8_t getBufferSize() { return _tempx100_array.size(); };
@@ -100,7 +100,7 @@ private:
 	
 	const uint8_t MEASUREMENT_TIMEOUT_MS = 20; 
 
-	const uint8_t MAX_BUFFER_SIZE = 50;
+	const uint8_t MAX_BUFFER_SIZE = 200; // this is kind of arbitrary. Just want to keep it from growing without bound.
 };
 
 #endif

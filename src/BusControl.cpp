@@ -64,7 +64,7 @@ void BusControl::init(void)
     _initialized = true;
 }
 
-void BusControl::set_power_lock(SPIDevices device, bool lock)
+void BusControl::set_power_lock(Devices device, bool lock)
 {
     switch(device)
     {
@@ -80,6 +80,12 @@ void BusControl::set_power_lock(SPIDevices device, bool lock)
         case IMU:
             power_lock.imu = lock;
             break;
+        case THERMOMETER:
+            power_lock.thermometer = lock;
+            break;
+        case VOC:
+            power_lock.voc = lock;
+            break;
     }
 }
 
@@ -90,8 +96,6 @@ void BusControl::spi_power(bool power)
         _logger->log(TRACE_WARNING, "%s", "Bus Control has not been initialized. Please run init().");
         return;
     }
-
-    if (get_spi_power() == power) return;
 
     if (!power_lock.fram)
     {
@@ -129,8 +133,6 @@ void BusControl::i2c_power(bool power)
         return;
     }
 
-    if (get_i2c_power() == true) return;
-
     _temp_vcc = power;
     _voc_vcc = power;
     _i2c_pu = power;
@@ -140,9 +142,13 @@ void BusControl::i2c_power(bool power)
 
 void BusControl::blink_led(milliseconds length)
 {
-    _led = 1;
-    ThisThread::sleep_for(length);
-    _led = 0;
+    for (int i = 0; i < _num_blinks; i++)
+    {
+        _led = 1;
+        ThisThread::sleep_for(length);
+        _led = 0;
+        ThisThread::sleep_for(250ms);
+    }
 }
 
 bool BusControl::get_spi_power()
