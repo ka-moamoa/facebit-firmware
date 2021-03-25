@@ -4,6 +4,7 @@
 #include "Si7051.h"
 #include "BusControl.h"
 #include "CapCalc.h"
+#include "Logger.h"
 
 class RespiratoryRate
 {
@@ -27,6 +28,7 @@ private:
     Si7051 &_temp;
     BusControl *_bus_control;
     LowPowerTimer _temp_timer;
+    Logger* _logger;
 
     vector<RR_t> respiratory_rate_buffer;
 

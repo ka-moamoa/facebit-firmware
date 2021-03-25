@@ -10,13 +10,15 @@ using namespace std::chrono;
 class BusControl
 {
 public:
-    enum SPIDevices 
+    enum Devices 
     {
         FRAM,
         MAGNETOMETER,
         BAROMETER,
         IMU,
-        SPI_LAST
+        THERMOMETER,
+        VOC,
+        DEVICES_LAST
     };
 
     BusControl(BusControl &other) = delete;
@@ -26,12 +28,13 @@ public:
 
     void init(void);
 
-    void set_power_lock(SPIDevices device, bool lock);
+    void set_power_lock(Devices device, bool lock);
 
     void spi_power(bool power);
     void i2c_power(bool power);
     
     void blink_led(milliseconds length);
+    void set_led_blinks(uint8_t num_blinks) { _num_blinks = num_blinks; };
 
     bool get_spi_power();
     bool get_i2c_power();
@@ -61,6 +64,7 @@ private:
     DigitalOut _i2c_pu; // must be high drive
 
     DigitalOut _led; // must be high drive
+    uint8_t _num_blinks = 1;
 
     // Initialized flag
     bool _initialized = false;
@@ -71,6 +75,8 @@ private:
         bool magnetometer;
         bool barometer;
         bool imu;
+        bool thermometer;
+        bool voc;
     };
 
     power_lock_t power_lock;

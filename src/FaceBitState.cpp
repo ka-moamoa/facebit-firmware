@@ -51,6 +51,7 @@ void FaceBitState::run()
         uint32_t ts = state_timer.read_ms();
 
         update_state(ts);
+        _bus_control->set_led_blinks((uint8_t)_mask_state + 1);
         
         if (ts - _last_ble_ts > BLE_BROADCAST_PERIOD)
         {
@@ -69,98 +70,27 @@ void FaceBitState::update_state(uint32_t ts)
     {
         case OFF_FACE_INACTIVE:
         {
-            if (_new_mask_state)
-            {
-                _bus_control->spi_power(true);
-                ThisThread::sleep_for(10ms);
-            
-                LSM6DSLSensor imu(&_spi, (PinName)IMU_CS);
-                imu.init(NULL);
-
-                imu.enable_x();
-                imu.enable_wake_up_detection(_wakeup_int_pin);
-                imu.set_wake_up_threshold(LSM6DSL_WAKE_UP_THRESHOLD_MID_LOW);
-
-                _bus_control->set_power_lock(BusControl::IMU, true);
-                _bus_control->spi_power(false);
-                
-                _sleep_duration = INACTIVE_SLEEP_DURATION;
-            }
-
-            if (_get_imu_int())
-            {
-                _logger->log(TRACE_INFO, "%s", "MOTION DETECTED");
-                _next_mask_state = OFF_FACE_ACTIVE;
-
-                _bus_control->spi_power(true);
-                ThisThread::sleep_for(10ms);
-
-                LSM6DSLSensor imu(&_spi, (PinName)IMU_CS);
-                imu.init(NULL);
-
-                imu.disable_x();
-                imu.disable_tilt_detection();
-
-                _bus_control->set_power_lock(BusControl::IMU, false);
-                _bus_control->spi_power(false);
-            }
+            _next_mask_state = ON_FACE;
             break;
         }
         case OFF_FACE_ACTIVE:
         {
-            if (_new_mask_state)
-            {
-                ACTIVE_STATE_ENTRY_TS = ts;
-                _sleep_duration = ACTIVE_SLEEP_DURATION;
-            }
-
-            Barometer barometer(&_spi, (PinName)BAR_CS, (PinName)BAR_DRDY);
-            MaskStateDetection mask_state(&barometer);
-
-            MaskStateDetection::MASK_STATE_t mask_status;
-            mask_status = mask_state.is_on(); // blocking call for ~5s
-
-            if (mask_status == MaskStateDetection::ON)
-            {
-                _logger->log(TRACE_INFO, "%s", "MASK ON");
-                _next_mask_state = ON_FACE;
-            }
-            else if (mask_status == MaskStateDetection::OFF)
-            {
-                _logger->log(TRACE_INFO, "%s", "MASK OFF");
-            }
-            else if (mask_status == MaskStateDetection::ERROR)
-            {
-                _logger->log(TRACE_WARNING, "%s", "MASK DETECTION ERROR");
-            }
-
-            if(ts - ACTIVE_STATE_ENTRY_TS > ACTIVE_STATE_TIMEOUT)
-            {
-                _next_mask_state = OFF_FACE_INACTIVE;
-                _next_task_state = IDLE;
-            }
-
+            _next_mask_state = ON_FACE;
             break;
         }
-        
         case ON_FACE:
         {
-        _sleep_duration = ON_FACE_SLEEP_DURATION;
+            _sleep_duration = ON_FACE_SLEEP_DURATION;
 
             switch(_task_state)
             {
                 case IDLE:
                 {
                     uint32_t rr_time_over = ts - _last_rr_ts;
-                    uint32_t hr_time_over = ts - _last_hr_ts;
 
-                    if (ts - _last_rr_ts >= RR_PERIOD && (rr_time_over >= hr_time_over))
+                    if (ts - _last_rr_ts >= RR_PERIOD)
                     {
                         _next_task_state = MEASURE_RESPIRATION_RATE;
-                    }
-                    else if (ts - _last_hr_ts >= HR_PERIOD && (hr_time_over >= rr_time_over))
-                    {
-                        _next_task_state = MEASURE_HEART_RATE;
                     }
 
                     break;
@@ -172,23 +102,30 @@ void FaceBitState::update_state(uint32_t ts)
                     Si7051 temp(&_i2c);
                     RespiratoryRate resp_rate(cap, temp);
 
+                    _logger->log(TRACE_INFO, "RESP RATE MEASUREMENT");
+
                     _last_rr_ts = ts;
 
                     if(resp_rate.get_resp_rate())
                     {
-                        RespiratoryRate::RR_t rr;
                         if (resp_rate.get_buffer_size())
                         {
-                            rr = resp_rate.get_buffer_element();
+                            _logger->log(TRACE_INFO, "Respiration rate success");
+
+                            RespiratoryRate::RR_t rr = resp_rate.get_buffer_element();
+
+                            FaceBitData rr_data;
+                            rr_data.data_type = RESPIRATORY_RATE;
+                            rr_data.timestamp = rr.timestamp;
+                            rr_data.value = rr.rate;
+
+                            data_buffer.push_back(rr_data);
                         }
 
-                        FaceBitData rr_data;
-                        rr_data.data_type = RESPIRATORY_RATE;
-                        rr_data.timestamp = rr.timestamp;
-                        rr_data.value = rr.rate;
-
-                        data_buffer.push_back(rr_data);
-
+                    }
+                    else
+                    {
+                        _logger->log(TRACE_INFO, "Respiration rate failure");
                     }
 
                     _next_task_state = IDLE;
@@ -236,36 +173,6 @@ void FaceBitState::update_state(uint32_t ts)
 
     if (_mask_state == ON_FACE && _task_state != _next_task_state)
     {
-        if (_next_task_state != IDLE)
-        {
-            /**
-             * We want to run mask on/off detection before every
-             * new task, so we don't waste energy on the task (and get
-             * an inaccurate result) if the mask is off.
-             */
-            Barometer barometer(&_spi, (PinName)BAR_CS, (PinName)BAR_DRDY);
-            MaskStateDetection mask_state(&barometer);
-
-            MaskStateDetection::MASK_STATE_t mask_status;
-            mask_status = mask_state.is_on(); // blocking call for ~5s
-
-            if (mask_status == MaskStateDetection::ON)
-            {
-                _logger->log(TRACE_INFO, "%s", "MASK ON");
-            }
-            else if (mask_status == MaskStateDetection::OFF)
-            {
-                _logger->log(TRACE_INFO, "%s", "MASK OFF");
-                _next_task_state = IDLE;
-                _next_mask_state = OFF_FACE_ACTIVE;
-            }
-            else if (mask_status == MaskStateDetection::ERROR)
-            {
-                _logger->log(TRACE_WARNING, "%s", "MASK DETECTION ERROR");
-                _next_task_state = IDLE; // don't run if we don't know
-            }
-        }
-
         _new_task_state = true;
         _task_state = _next_task_state;
         _logger->log(TRACE_INFO, "TASK STATE: %i", _task_state);
