@@ -131,10 +131,10 @@ bool RespiratoryRate::get_resp_rate()
         //printf("Mean %f\r\n", mean);
         float resp_rate = calc_resp_rate(samples, SAMPLE_SIZE, mean);
         if(resp_rate != -1){
-            printf("RR %0.2f bpm\r\n", resp_rate);
+            _logger->log(TRACE_DEBUG, "RR %0.2f bpm", resp_rate);
         }
         else{
-            printf("Sample discarded... Wait for the new reading\r\n");
+            _logger->log(TRACE_DEBUG, "Sample discarded... Wait for the new reading");
         }
 
         if (resp_rate > 4 && resp_rate < 25)
