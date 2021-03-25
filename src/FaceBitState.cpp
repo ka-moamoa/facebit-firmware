@@ -53,7 +53,7 @@ void FaceBitState::run()
         update_state(ts);
         _bus_control->set_led_blinks((uint8_t)_mask_state + 1);
         
-        if (ts - _last_ble_ts > BLE_BROADCAST_PERIOD)
+        if (ts - _last_ble_ts > BLE_BROADCAST_PERIOD && !_new_mask_state) // don't want to broadcast while we're switching states
         {
             _sync_data(&_ble_process);
             _last_ble_ts = ts;
@@ -70,100 +70,23 @@ void FaceBitState::update_state(uint32_t ts)
     {
         case OFF_FACE_INACTIVE:
         {
-            if (_new_mask_state)
-            {
-                _bus_control->spi_power(true);
-                ThisThread::sleep_for(10ms);
-            
-                LSM6DSLSensor imu(&_spi, (PinName)IMU_CS);
-                imu.init(NULL);
-
-                imu.enable_x();
-                imu.enable_wake_up_detection(_wakeup_int_pin);
-                imu.set_wake_up_threshold(LSM6DSL_WAKE_UP_THRESHOLD_MID_LOW);
-
-                _bus_control->set_power_lock(BusControl::IMU, true);
-                _bus_control->spi_power(false);
-                
-                _sleep_duration = INACTIVE_SLEEP_DURATION;
-            }
-
-            if (_get_imu_int())
-            {
-                _logger->log(TRACE_INFO, "%s", "MOTION DETECTED");
-                _next_mask_state = OFF_FACE_ACTIVE;
-
-                _bus_control->spi_power(true);
-                ThisThread::sleep_for(10ms);
-
-                LSM6DSLSensor imu(&_spi, (PinName)IMU_CS);
-                imu.init(NULL);
-
-                imu.disable_x();
-                imu.disable_tilt_detection();
-
-                _bus_control->set_power_lock(BusControl::IMU, false);
-                _bus_control->spi_power(false);
-            }
+            _next_mask_state = ON_FACE;
             break;
         }
         case OFF_FACE_ACTIVE:
         {
-            if (_new_mask_state)
-            {
-                ACTIVE_STATE_ENTRY_TS = ts;
-                _sleep_duration = ACTIVE_SLEEP_DURATION;
-            }
-
-            Barometer barometer(&_spi, (PinName)BAR_CS, (PinName)BAR_DRDY);
-            MaskStateDetection mask_state(&barometer);
-
-            MaskStateDetection::MASK_STATE_t mask_status;
-            mask_status = mask_state.is_on(); // blocking call for ~5s
-
-            if (mask_status == MaskStateDetection::ON)
-            {
-                _logger->log(TRACE_INFO, "%s", "MASK ON");
             _next_mask_state = ON_FACE;
-            }
-            else if (mask_status == MaskStateDetection::OFF)
-            {
-                _logger->log(TRACE_INFO, "%s", "MASK OFF");
-            }
-            else if (mask_status == MaskStateDetection::ERROR)
-            {
-                _logger->log(TRACE_WARNING, "%s", "MASK DETECTION ERROR");
-            }
-
-            if(ts - ACTIVE_STATE_ENTRY_TS > ACTIVE_STATE_TIMEOUT)
-            {
-                _next_mask_state = OFF_FACE_INACTIVE;
-                _next_task_state = IDLE;
-            }
-
             break;
         }
         case ON_FACE:
         {
-            _sleep_duration = ON_FACE_SLEEP_DURATION;
+            _sleep_duration = ON_FACE_SLEEP_DURATION; // default. can be overridden by setting later in the switch statement
 
             switch(_task_state)
             {
                 case IDLE:
                 {
-                    uint32_t rr_time_over = ts - _last_rr_ts;
-                    uint32_t hr_time_over = ts - _last_hr_ts;
-
-                    if (ts - _last_rr_ts >= RR_PERIOD && (rr_time_over >= hr_time_over))
-                    {
-                        _next_task_state = MEASURE_RESPIRATION_RATE;
-                    }
-                    else if (ts - _last_hr_ts >= HR_PERIOD && (hr_time_over >= rr_time_over))
-                    {
-                        _next_task_state = MEASURE_HEART_RATE;
-                    }
-
-                    break;
+                    _next_task_state = MEASURE_HEART_RATE;
                 }
 
                 case MEASURE_RESPIRATION_RATE:
@@ -307,13 +230,16 @@ bool FaceBitState::_get_imu_int()
 
 bool FaceBitState::_sync_data(GattServerProcess *_ble_process)
 {    
+    _logger->log(TRACE_TRACE, "BLE SYNC TASK");
+
+
     if (data_buffer.size() == 0 && _force_update == false)
     {
-        _logger->log(TRACE_DEBUG, "%s", "NO DATA TO SEND");
+        _logger->log(TRACE_TRACE, "NO DATA TO SEND, END BLE SYNC");
         return false;
     }
 
-    _logger->log(TRACE_DEBUG, "%s", "BLE SYNC");
+    _logger->log(TRACE_TRACE, "ATTEMPTING TO SEND %i DATA ELEMENTS", data_buffer.size());
 
     // start ble
     _ble_thread.flags_set(START_BLE);
@@ -323,21 +249,16 @@ bool FaceBitState::_sync_data(GattServerProcess *_ble_process)
     ble_timeout.start();
     while(!_ble_process->is_connected())
     {
-        Thread::State state = _ble_thread.get_state();
-        uint16_t size = _ble_process->event_queue_size;
-        // _logger->log(TRACE_TRACE, "Thread state = %u, equeue size = %u", state, size);
-        
         if (ble_timeout.read_ms() > BLE_CONNECTION_TIMEOUT)
         {
             _logger->log(TRACE_INFO, "%s", "TIMEOUT BEFORE BLE CONNECTION");
             _ble_thread.flags_set(STOP_BLE);
             return false;
         }
-
-        ThisThread::sleep_for(10ms);
+        ThisThread::sleep_for(100ms);
     }
 
-    // set mask on characteristic based on state
+    // set "mask on" characteristic
     _smart_ppe_ble->updateMaskOn(_mask_state_change_ts, _mask_state);
     _smart_ppe_ble->updateDataReady(SmartPPEService::MASK_ON);
 
