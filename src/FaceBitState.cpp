@@ -121,11 +121,21 @@ void FaceBitState::update_state(uint32_t ts)
 
                             data_buffer.push_back(rr_data);
                         }
+                        else
+                        {
+                            _logger->log(TRACE_WARNING, "resp rate success, but no data");
+                        }
 
                     }
                     else
                     {
-                        _logger->log(TRACE_INFO, "Respiration rate failure");
+                        _logger->log(TRACE_INFO, "Respiratory rate failure");
+                        FaceBitData rr_failure;
+                        rr_failure.data_type = RESPIRATORY_RATE;
+                        rr_failure.timestamp = ts;
+                        rr_failure.value = RESP_RATE_FAILURE;
+
+                        data_buffer.push_back(rr_failure);
                     }
 
                     _next_task_state = IDLE;
@@ -260,7 +270,7 @@ bool FaceBitState::_sync_data(GattServerProcess *_ble_process)
             return false;
         }
 
-        ThisThread::sleep_for(100ms);
+        ThisThread::sleep_for(500ms);
     }
 
     // sync timestamp
