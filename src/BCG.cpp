@@ -3,6 +3,8 @@
 #include "Utilites.h"
 #include <numeric>
 
+#define BCG_LOGGING
+
 using namespace std::chrono;
 
 BCG::BCG(SPI *spi, PinName int1_pin, PinName cs) : 
@@ -92,6 +94,12 @@ bool BCG::bcg(const seconds num_seconds)
 
     _logger->log(TRACE_INFO, "%s", "SENSING HR");
 
+    #ifdef BCG_LOGGING
+    {
+        _logger->log(TRACE_WARNING, "ts, x, y, z, x_filt, y_filt, z_filt, l2norm, bcg");
+    }
+    #endif // BCG_LOGGING
+
     // acquire and process samples until num_seconds has elapsed
     while(zc_timer.elapsed_time() <= duration_cast<microseconds>(num_seconds))
     {
@@ -107,19 +115,22 @@ bool BCG::bcg(const seconds num_seconds)
             acquired_samples++;
 
             // put each axis through bcg features isolation filter
-            x = bcg_isolation_x.step(x);
-            y = bcg_isolation_y.step(y);
-            z = bcg_isolation_z.step(z);
+            double xfilt = bcg_isolation_x.step(x);
+            double yfilt = bcg_isolation_y.step(y);
+            double zfilt = bcg_isolation_z.step(z);
             
             // l2norm the signal
-            double mag = _l2norm(x, y, z);
-
-            // printf("%f, ", mag);
+            double mag = _l2norm(xfilt, yfilt, zfilt);
 
             // send l2norm through hr isolation filter
             float next_bcg_val = hr_isolation.step(mag);
-            // _logger->log(TRACE_INFO, "bcg val = %0.2f", next_bcg_val);
-            
+
+            #ifdef BCG_LOGGING
+            {
+                _logger->log(TRACE_WARNING, "%i, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f", zc_timer.read_ms(), x, y, z, xfilt, yfilt, zfilt, mag, next_bcg_val);
+            }
+            #endif // BCG_LOGGING
+
             // look for a descending zero-cross
             if (last_bcg_val > 0 && next_bcg_val <= 0)
             {

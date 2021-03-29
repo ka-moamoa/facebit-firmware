@@ -87,6 +87,7 @@ void FaceBitState::update_state(uint32_t ts)
                 case IDLE:
                 {
                     _next_task_state = MEASURE_HEART_RATE;
+                    break;
                 }
 
                 case MEASURE_RESPIRATION_RATE:
@@ -132,7 +133,7 @@ void FaceBitState::update_state(uint32_t ts)
                     _last_hr_ts = ts;
                     BCG bcg(&_spi, (PinName)IMU_INT1, (PinName)IMU_CS);
 
-                    if(bcg.bcg(15s)) // blocking
+                    if(bcg.bcg(30s)) // blocking
                     {
                         _logger->log(TRACE_INFO, "%s", "HR CAPTURED!");
                         for(int i = 0; i < bcg.get_buffer_size(); i++)
@@ -166,36 +167,6 @@ void FaceBitState::update_state(uint32_t ts)
 
     if (_mask_state == ON_FACE && _task_state != _next_task_state)
     {
-        if (_next_task_state != IDLE)
-        {
-            /**
-             * We want to run mask on/off detection before every
-             * new task, so we don't waste energy on the task (and get
-             * an inaccurate result) if the mask is off.
-             */
-            Barometer barometer(&_spi, (PinName)BAR_CS, (PinName)BAR_DRDY);
-            MaskStateDetection mask_state(&barometer);
-
-            MaskStateDetection::MASK_STATE_t mask_status;
-            mask_status = mask_state.is_on(); // blocking call for ~5s
-
-            if (mask_status == MaskStateDetection::ON)
-            {
-                _logger->log(TRACE_INFO, "%s", "MASK ON");
-            }
-            else if (mask_status == MaskStateDetection::OFF)
-            {
-                _logger->log(TRACE_INFO, "%s", "MASK OFF");
-                _next_task_state = IDLE;
-                _next_mask_state = OFF_FACE_ACTIVE;
-            }
-            else if (mask_status == MaskStateDetection::ERROR)
-            {
-                _logger->log(TRACE_WARNING, "%s", "MASK DETECTION ERROR");
-                _next_task_state = IDLE; // don't run if we don't know
-            }
-        }
-
         _new_task_state = true;
         _task_state = _next_task_state;
         _logger->log(TRACE_INFO, "TASK STATE: %i", _task_state);
