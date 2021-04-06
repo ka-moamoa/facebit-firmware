@@ -1,8 +1,5 @@
 {
     "SMARTPPE": {
-        "supported_form_factors": [
-            "ARDUINO"
-        ],
         "inherits": [
             "MCU_NRF52832"
         ],

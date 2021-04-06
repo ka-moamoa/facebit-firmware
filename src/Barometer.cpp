@@ -147,6 +147,11 @@ uint64_t Barometer::get_delta_timestamp(bool broadcast)
     return delta_t;
 }
 
+float Barometer::convert_to_hpa(uint16_t raw_data)
+{
+  return ((float)raw_data + 80000.0) / 100.0;
+}
+
 bool Barometer::read_buffered_data()
 {
     if (_barometer.get_fifo(_pressure_buffer, _temperature_buffer) == LPS22HB_ERROR)
@@ -173,6 +178,8 @@ bool Barometer::read_buffered_data()
 
 void Barometer::set_max_buffer_size(uint16_t size)
 {
+    if (size > MAX_ALLOWABLE_SIZE) size = MAX_ALLOWABLE_SIZE;
+
     _max_buffer_size = size;
 }
 

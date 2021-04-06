@@ -11,7 +11,8 @@ public:
     Barometer(SPI *spi, PinName cs_pin, PinName int_pin);
     ~Barometer();
 
-    const float BAROMETER_FREQUENCY = 25.0; //Hz
+    const float BAROMETER_FREQUENCY = 24.0; //Hz
+    const uint16_t MAX_ALLOWABLE_SIZE = 200; //This is a little arbitrary, just want to have a cap on the buffer size.
 
     bool initialize();
     bool update();
@@ -33,6 +34,8 @@ public:
     void clear_buffers() { _temperature_buffer.clear(); _pressure_buffer.clear(); };
     uint64_t get_delta_timestamp(bool broadcast);
     uint32_t get_measurement_frequencyx100() { return _measurement_frequencyx100; };
+
+    float convert_to_hpa(uint16_t raw_data);
 
 private:
     bool _initialized = false;

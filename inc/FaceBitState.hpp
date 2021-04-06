@@ -43,7 +43,7 @@ public:
     };
 
     void run();
-    void update_state(uint32_t ts);
+    void update_state();
 private:
     SPI _spi;
     I2C _i2c;
@@ -54,6 +54,8 @@ private:
     static Thread _ble_thread;
     static events::EventQueue ble_queue;
     bool _force_update;
+
+    LowPowerTimer state_timer;
 
     DigitalIn _imu_cs;
     LSM6DSL_Interrupt_Pin_t _wakeup_int_pin = LSM6DSL_INT1_PIN;

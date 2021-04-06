@@ -59,8 +59,8 @@ void Logger::log(trace_level_t level, const char *msg, ...)
     va_list args;
     va_start (args, msg);
 
-    char buffer[50];
-    vsnprintf(buffer, 50, msg, args);
+    char buffer[100];
+    vsnprintf(buffer, 100, msg, args);
     va_end(args);
 
     if (_uart)

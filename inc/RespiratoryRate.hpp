@@ -3,8 +3,11 @@
 
 #include "Si7051.h"
 #include "BusControl.h"
-#include "CapCalc.h"
+#include "Barometer.hpp"
 #include "Logger.h"
+#include "../iir-filter-kit/BiQuad.h"
+
+using namespace std::chrono;
 
 class RespiratoryRate
 {
@@ -15,28 +18,24 @@ public:
         uint64_t timestamp;
     } RR_t;
 
-    RespiratoryRate(CapCalc *cap, Si7051 &temp);
+    RespiratoryRate(Si7051 &temp, Barometer &barometer);
     ~RespiratoryRate();
 
     RR_t get_buffer_element();
     uint8_t get_buffer_size() { return respiratory_rate_buffer.size(); };
 
-    bool get_resp_rate();
+    float respiratory_rate(const seconds num_seconds);
     
 private:
-    CapCalc *_cap;
     Si7051 &_temp;
+    Barometer &_barometer;
+
     BusControl *_bus_control;
-    LowPowerTimer _temp_timer;
     Logger* _logger;
 
     vector<RR_t> respiratory_rate_buffer;
 
-    float calc_resp_rate(float samples[], int SAMPLE_SIZE, float mean);
-
-    const int SENSING_ENERGY = 0.001;
-    const float MIN_VOLTAGE = 2.3;
-
+    const int8_t ERROR = -1;
 };
 
 

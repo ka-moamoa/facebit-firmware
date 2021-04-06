@@ -33,30 +33,27 @@ FaceBitState::~FaceBitState()
 void FaceBitState::run()
 {
     _spi.frequency(8000000); // fast, to reduce transaction time
-    LowPowerTimer state_timer;
 
     state_timer.start();
 
-    BLE &_ble = BLE::Instance();
-    GattServerProcess _ble_process(ble_queue, _ble);
-    _ble_process.on_init(callback(_smart_ppe_ble, &SmartPPEService::start));
+    // BLE &_ble = BLE::Instance();
+    // GattServerProcess _ble_process(ble_queue, _ble);
+    // _ble_process.on_init(callback(_smart_ppe_ble, &SmartPPEService::start));
     
-    _ble_thread.start(callback(&_ble_process, &GattServerProcess::run));
+    // _ble_thread.start(callback(&_ble_process, &GattServerProcess::run));
     
-    _force_update = true;
-    _sync_data(&_ble_process);
+    // _force_update = true;
+    // _sync_data(&_ble_process);
 
     while(1)
     {
-        uint32_t ts = state_timer.read_ms();
-
-        update_state(ts);
+        update_state();
         _bus_control->set_led_blinks((uint8_t)_mask_state + 1);
         
-        if (ts - _last_ble_ts > BLE_BROADCAST_PERIOD)
+        if (state_timer.read_ms() - _last_ble_ts > BLE_BROADCAST_PERIOD)
         {
-            _sync_data(&_ble_process);
-            _last_ble_ts = ts;
+            // _sync_data(&_ble_process);
+            _last_ble_ts = state_timer.read_ms();
         }
 
         _logger->log(TRACE_TRACE, "sleeping for %lli", static_cast<long long int>(_sleep_duration.count()));
@@ -64,7 +61,7 @@ void FaceBitState::run()
     }
 }
 
-void FaceBitState::update_state(uint32_t ts)
+void FaceBitState::update_state()
 {
     switch(_mask_state)
     {
@@ -86,53 +83,39 @@ void FaceBitState::update_state(uint32_t ts)
             {
                 case IDLE:
                 {
-                    uint32_t rr_time_over = ts - _last_rr_ts;
-
-                    if (ts - _last_rr_ts >= RR_PERIOD)
-                    {
-                        _next_task_state = MEASURE_RESPIRATION_RATE;
-                    }
-
+                    _next_task_state = MEASURE_RESPIRATION_RATE;
                     break;
                 }
 
                 case MEASURE_RESPIRATION_RATE:
                 {
-                    CapCalc* cap = CapCalc::get_instance();
                     Si7051 temp(&_i2c);
-                    RespiratoryRate resp_rate(cap, temp);
+                    Barometer barometer(&_spi, BAR_CS, BAR_DRDY);
+                    RespiratoryRate resp_rate(temp, barometer);
 
                     _logger->log(TRACE_INFO, "RESP RATE MEASUREMENT");
 
-                    _last_rr_ts = ts;
+                    _last_rr_ts = state_timer.read_ms();
 
-                    if(resp_rate.get_resp_rate())
+                    float rate = resp_rate.respiratory_rate(600s);
+
+                    if(rate != -1)
                     {
-                        if (resp_rate.get_buffer_size())
-                        {
-                            _logger->log(TRACE_INFO, "Respiration rate success");
+                        _logger->log(TRACE_INFO, "Respiration rate success");
 
-                            RespiratoryRate::RR_t rr = resp_rate.get_buffer_element();
+                        FaceBitData rr_data;
+                        rr_data.data_type = RESPIRATORY_RATE;
+                        rr_data.timestamp = state_timer.read_ms();
+                        rr_data.value = rate;
 
-                            FaceBitData rr_data;
-                            rr_data.data_type = RESPIRATORY_RATE;
-                            rr_data.timestamp = rr.timestamp;
-                            rr_data.value = rr.rate;
-
-                            data_buffer.push_back(rr_data);
-                        }
-                        else
-                        {
-                            _logger->log(TRACE_WARNING, "resp rate success, but no data");
-                        }
-
+                        data_buffer.push_back(rr_data);
                     }
                     else
                     {
                         _logger->log(TRACE_INFO, "Respiratory rate failure");
                         FaceBitData rr_failure;
                         rr_failure.data_type = RESPIRATORY_RATE;
-                        rr_failure.timestamp = ts;
+                        rr_failure.timestamp = state_timer.read_ms();
                         rr_failure.value = RESP_RATE_FAILURE;
 
                         data_buffer.push_back(rr_failure);
@@ -146,7 +129,7 @@ void FaceBitState::update_state(uint32_t ts)
                 case MEASURE_HEART_RATE:
                 {
                     _logger->log(TRACE_INFO, "%s", "MEASURING HR");
-                    _last_hr_ts = ts;
+                    _last_hr_ts = state_timer.read_ms();
                     BCG bcg(&_spi, (PinName)IMU_INT1, (PinName)IMU_CS);
 
                     if(bcg.bcg(15s)) // blocking

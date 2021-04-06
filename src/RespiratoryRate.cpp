@@ -1,8 +1,14 @@
 #include "RespiratoryRate.hpp"
+#include <numeric>
 #include "Utilites.h"
 
-RespiratoryRate::RespiratoryRate(CapCalc *cap, Si7051 &temp) : _cap(cap),
-                                                               _temp(temp)
+#define RESP_RATE_LOGGING
+
+using namespace std::chrono;
+
+RespiratoryRate::RespiratoryRate(Si7051 &temp,  Barometer &barometer) : 
+_temp(temp),
+_barometer(barometer)
 {
     _bus_control = BusControl::get_instance();
     _logger = Logger::get_instance();
@@ -19,136 +25,127 @@ RespiratoryRate::RR_t RespiratoryRate::get_buffer_element()
     return tmp;
 }
 
-float RespiratoryRate::calc_resp_rate(float samples[], int SAMPLE_SIZE, float mean)
+float RespiratoryRate::respiratory_rate(const seconds num_seconds)
 {
-    int i = 1;
-    uint8_t max_count = 0;
-    float local_max = 0;
-    int local_max_index = 0;
-    float max_average = 0;
-    float delta = 0.5;
-    int first_peak;
-    int last_peak;
-    float threshold = 0.05;
-    vector<int> peak_indices;
-    while (i < SAMPLE_SIZE)
+    // turn on SPI bus
+    _bus_control->spi_power(true);
+
+    /**
+     * @brief Init 4th order bandpass (1/15-0.5 Hz) Butterworth filter
+     * 
+     * Documentation can be found in BiQuad.h. BiQuads were 
+     * generated with MATLAB assuming 25 Hz sampling frequency.
+     */
+
+    BiQuadChain pressure_bpf;
+	BiQuad bq1( 5.68788e-02, 0.00000e+00, -5.68788e-02, -1.88565e+00, 8.86242e-01 );	
+	pressure_bpf.add( &bq1 );
+
+
+	BiQuadChain temperature_bpf;
+	BiQuad bq2( 1.99140e-01, 0.00000e+00, -1.99140e-01, -1.59970e+00, 6.01721e-01 );	
+	temperature_bpf.add( &bq2 );
+
+    // give time for the chip to turn on
+    ThisThread::sleep_for(10ms);
+
+    if (!_barometer.initialize() || !_barometer.set_fifo_full_interrupt(true))
     {
-        if (samples[i] - mean > 0)
-        {
-            if (local_max < samples[i])
-            {
-                local_max = samples[i];
-                local_max_index = i;
-            }
-        }
-        else if (samples[i] - mean <= 0)
-        {
-            if (local_max != 0)
-            {
-                if (max_average != 0 && abs(local_max - max_average) < delta)
-                {
-                    if (max_count == 0)
-                    {
-                        first_peak = local_max_index;
-                    }
-                    else
-                    {
-                        last_peak = local_max_index;
-                    }
-                    max_count = max_count + 1;
-                    peak_indices.push_back(local_max_index);
-                    max_average = (max_average + local_max) / 2;
-                    local_max = 0;
-                }
-                else if (max_average == 0)
-                {
-                    peak_indices.push_back(local_max_index);
-                    max_count = max_count + 1;
-                    max_average = local_max;
-                    local_max = 0;
-                }
-            }
-        }
-        i = i + 1;
+        _logger->log(TRACE_WARNING, "%s", "barometer failed to initialize");
+        return ERROR;
     }
-    float duration = (peak_indices.back() - peak_indices.front()) / _temp.getMeasurementFrequency();
-    if(max_count == 1){
-        printf("Breathing too slow\r\n");
-        return -2;
-    }
-    else if (abs(max_average - mean) < threshold || max_count == 0 || duration <= 0)
+
+    // start timer
+    LowPowerTimer timer;
+    timer.start();
+
+    // initialize variables
+    double last_pressure_val = -1.0;
+    uint16_t sample_index = 0;
+    vector<uint16_t> zc_indices;
+	float min_val = 0, max_val = 0;
+	bool initialized = false;
+
+	#ifdef RESP_RATE_LOGGING
+	{
+		_logger->log(TRACE_INFO, "ts, pressure, filtered_pressure, d_zc, a_zc, raw_temp, filtered_temp");
+	}
+	#endif // RESP_RATE_LOGGING
+
+    while (timer.elapsed_time() <= duration_cast<microseconds>(num_seconds))
     {
-        return -1; //discard the sample
-    }
-    else
-    {        
-        float resp_rate = (60 * (max_count - 1)) / duration;
-        return resp_rate;
-    }
-}
+        _barometer.update();
 
-bool RespiratoryRate::get_resp_rate()
-{
-    bool new_resp_rate = false;
-
-    // if ((_cap->calc_joules() > SENSING_ENERGY && _cap.read_voltage() > MIN_VOLTAGE))
-    {
-        _bus_control->i2c_power(true);
-        ThisThread::sleep_for(1000ms);
-
-        _temp.initialize();
-        const int SAMPLE_SIZE = 150;
-
-        float samples[SAMPLE_SIZE] = {};
-        float sum = 0;
-
-        for (int i = 0; i < SAMPLE_SIZE;)
+        uint16_t buffer_size = _barometer.get_pressure_buffer_size();
+        if (buffer_size >= 32)
         {
-            _temp.update();
-            while (_temp.getBufferSize() < SAMPLE_SIZE)
-            {
-                ThisThread::sleep_for(90ms);
-                while(!_temp.update())
-                {
-                    ThisThread::sleep_for(1ms);
-                }
-            }
-
-            _bus_control->i2c_power(false);
-
-            uint16_t *buffer = _temp.getBuffer();
-            for (int j = 0; j < _temp.getBufferSize(); j++)
-            {
-                samples[i] = (buffer[j] / 100.0);
-                sum = sum + samples[i];
-                i++;
-            }
-            _temp.clearBuffer();
-            ThisThread::sleep_for(50ms);
-        }
-        // convert to floating points
-        float mean = (sum) / SAMPLE_SIZE;
-        //printf("Mean %f\r\n", mean);
-        float resp_rate = calc_resp_rate(samples, SAMPLE_SIZE, mean);
-        if(resp_rate != -1){
-            printf("RR %0.2f bpm\r\n", resp_rate);
-        }
-        else{
-            printf("Sample discarded... Wait for the new reading\r\n");
-        }
-
-        if (resp_rate > 4 && resp_rate < 25)
-        {
-            new_resp_rate = true;
+            uint16_t* pressure_samples = _barometer.get_pressure_array();
+			uint16_t* temperature_samples = _barometer.get_temperature_array();
             
-            RR_t new_rate;
-            new_rate.rate = Utilities::round(resp_rate * 10);
-            new_rate.timestamp = time(NULL);
+            for (int i = 0; i < buffer_size; i++)
+            {
+                double pressure_sample = _barometer.convert_to_hpa(pressure_samples[i]);
+				double temperature_sample = (float)temperature_samples[i] / 10.0;
 
-            respiratory_rate_buffer.push_back(new_rate);
+				if (!initialized)
+				{
+					for (int i = 0; i < _barometer.BAROMETER_FREQUENCY * 200; i++)
+					{
+						pressure_bpf.step(pressure_sample); // prime filter with initial value
+						temperature_bpf.step(temperature_sample);
+					}
+
+					initialized = true;
+				}
+
+                // pass sample through bandpass filter
+                double filtered_pressure_sample = pressure_bpf.step(pressure_sample);
+				double filtered_temp_sample = temperature_bpf.step(temperature_sample);
+
+                // look for zero-crosses
+				bool d_zc = false;
+				bool a_zc = false;
+                if (last_pressure_val > 0 && filtered_pressure_sample < 0)
+                {
+                    zc_indices.push_back(sample_index);
+					max_val = 0;
+					min_val = 0;
+
+					d_zc = true;
+                }
+				else if (last_pressure_val < 0 && filtered_pressure_sample > 0)
+				{
+					a_zc = true;
+				}
+
+				#ifdef RESP_RATE_LOGGING
+				{
+					_logger->log(TRACE_INFO, "%f, %f, %f, %i, %i, %f, %f", timer.read(), pressure_sample, filtered_pressure_sample, d_zc, a_zc, temperature_sample, filtered_temp_sample);
+					wait_us(750);
+				}
+				#endif // RESP_RATE_LOGGING
+
+				last_pressure_val = filtered_pressure_sample;
+                sample_index++;
+            }
+
+			_barometer.clear_buffers();
         }
-        
+
+		ThisThread::sleep_for(10ms);
     }
 
-    return new_resp_rate;
+	// now calculate resp rate from the zero-crosses we've detected
+	vector<double> zc_ts(zc_indices.begin(), zc_indices.end()); // copy indices to new vector
+
+	Utilities::multiply(zc_ts, 1.0 / _barometer.BAROMETER_FREQUENCY); // convert indices to timestamps
+
+	std::adjacent_difference(zc_ts.begin(), zc_ts.end(), zc_ts.begin());
+
+	Utilities::reciprocal(zc_ts); // get element-wise frequency
+	Utilities::multiply(zc_ts, 60.0); // get element_wise respiratory rate
+
+	double resp_rate = Utilities::mean(zc_ts);
+
+	return resp_rate;
 }
