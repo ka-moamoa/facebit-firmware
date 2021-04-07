@@ -38,6 +38,7 @@ private:
     const uint8_t HR_BUFFER_SIZE = 20; // how many heart rates we want to store on device
     vector<HR_t> _HR;
 
+    const uint8_t IMU_TIMEOUT = 2; // seconds
     const float G_FREQUENCY = 51.0; // Hz
     const float G_FULL_SCALE = 124.0; // max sensitivity
 
@@ -57,6 +58,8 @@ private:
     const uint8_t MAX_HR = 150; // BPM above this limit are filtered out during the HR_isolation stage
 
     double _l2norm(double x, double y, double z);
+    void _init_imu(LSM6DSLSensor& imu);
+    void _reset_imu(LSM6DSLSensor& imu);
 };
 
 #endif //BCG_H_

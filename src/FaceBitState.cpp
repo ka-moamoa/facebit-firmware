@@ -148,6 +148,16 @@ void FaceBitState::update_state(uint32_t ts)
                             data_buffer.push_back(hr_data);
                         }
                     }
+                    else
+                    {
+                        FaceBitData hr_data;
+
+                        hr_data.data_type = HEART_RATE;
+                        hr_data.timestamp = time(NULL);
+                        hr_data.value = 255;
+
+                        data_buffer.push_back(hr_data);                       
+                    }
                     _next_task_state = IDLE;
                     break;
                 }

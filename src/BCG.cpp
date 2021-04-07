@@ -32,6 +32,9 @@ bool BCG::bcg(const seconds num_seconds)
     // turn on SPI bus
     _bus_control->spi_power(true);
 
+    // Give time for the chip to turn on
+    ThisThread::sleep_for(10ms);
+
     /**
      * @brief Init 4th order bandpass (10-13 Hz) Butterworth filters
      * 
@@ -40,11 +43,6 @@ bool BCG::bcg(const seconds num_seconds)
      * Documentation can be found in BiQuad.h. BiQuads were 
      * generated with MATLAB assuming 104 Hz sampling frequency.
      */
-
-    
-    
-    
-    
     BiQuadChain bcg_isolation_x;
     BiQuad bqx1( 6.76087639e-04,  1.35217528e-03,  6.76087639e-04,  1.00000000e+00, -2.16739514e-01,  7.10632547e-01);
     BiQuad bqx2( 1.00000000e+00,  2.00000000e+00,  1.00000000e+00,  1.00000000e+00, -4.54393846e-01,  7.17539837e-01);
@@ -74,19 +72,9 @@ bool BCG::bcg(const seconds num_seconds)
 
     hr_isolation.add( &bq5 ).add ( &bq6 );
 
-    // Give time for the chip to turn on
-    ThisThread::sleep_for(10ms);
-
     // Set up gyroscope
     LSM6DSLSensor imu(_spi, _cs);
-    imu.init(NULL);
-    imu.set_g_odr(G_FREQUENCY);
-    imu.set_g_fs(G_FULL_SCALE);
-    imu.enable_g();
-    imu.enable_int1_drdy_g();
-
-    // let gyroscope warm up
-    ThisThread::sleep_for(500ms);
+    _init_imu(imu);
 
     // init some tracker variables
     float last_bcg_val = -1.0;
@@ -95,6 +83,8 @@ bool BCG::bcg(const seconds num_seconds)
     bool new_hr_reading = false;
     bool initialized = false;
 
+    LowPowerTimer timeout;
+    timeout.start();
     LowPowerTimer zc_timer;
     zc_timer.start();
 
@@ -106,13 +96,13 @@ bool BCG::bcg(const seconds num_seconds)
     }
     #endif // BCG_LOGGING
 
-    // TODO add timeout to IMU
-
     // acquire and process samples until num_seconds has elapsed
     while(zc_timer.elapsed_time() <= duration_cast<microseconds>(num_seconds))
     {
         if (_g_drdy.read())        
-        {
+        {   
+            timeout.reset();
+
             // get samples
             float gyr[3] = {0};
             imu.get_g_axes_f(gyr);
@@ -206,6 +196,12 @@ bool BCG::bcg(const seconds num_seconds)
         }
         
         ThisThread::sleep_for(1ms);
+        if (timeout.read() > IMU_TIMEOUT)
+        {
+            _logger->log(TRACE_WARNING, "IMU timeout during BCG. Resetting...");
+            _reset_imu(imu);
+            timeout.reset();
+        }
     }
 
     if (rates.size() > 0)
@@ -226,7 +222,7 @@ bool BCG::bcg(const seconds num_seconds)
         _logger->log(TRACE_INFO, "average HR after outlier detection = %0.1f, std_dev = %0.1f", average_rate, std_dev_rate);
     
         HR_t new_hr;
-        new_hr.rate = average_rate;
+        new_hr.rate = Utilities::round(average_rate);
         new_hr.timestamp = time(NULL);
 
 
@@ -242,6 +238,7 @@ bool BCG::bcg(const seconds num_seconds)
 
     _bus_control->spi_power(false);
     zc_timer.stop(); 
+    timeout.stop();
 
     return new_hr_reading;
 }
@@ -250,6 +247,25 @@ double BCG::_l2norm(double x, double y, double z)
 {
     double result = sqrt( (x * x) + (y * y) + (z * z) );
     return result;
+}
+
+void BCG::_init_imu(LSM6DSLSensor& imu)
+{
+    imu.init(NULL);
+    imu.set_g_odr(G_FREQUENCY);
+    imu.set_g_fs(G_FULL_SCALE);
+    imu.enable_g();
+    imu.enable_int1_drdy_g();
+}
+
+void BCG::_reset_imu(LSM6DSLSensor& imu)
+{
+    _bus_control->spi_power(false);
+    ThisThread::sleep_for(10ms);
+    _bus_control->spi_power(true);
+    ThisThread::sleep_for(10ms);
+
+    _init_imu(imu);
 }
 
 
