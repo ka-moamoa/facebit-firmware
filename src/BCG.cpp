@@ -41,22 +41,22 @@ bool BCG::bcg(const seconds num_seconds)
      * generated with MATLAB assuming 104 Hz sampling frequency.
      */
     BiQuadChain bcg_isolation_x;
-    BiQuad bqx1( 3.48624e-05, -6.97248e-05, 3.48624e-05, -1.42500e+00, 8.55705e-01 );
-    BiQuad bqx2( 1.00000e+00, 2.00013e+00, 1.00013e+00, -1.50474e+00, 8.66039e-01 );
-    BiQuad bqx3( 1.00000e+00, 1.99987e+00, 9.99873e-01, -1.42640e+00, 9.34678e-01 );
-    BiQuad bqx4( 1.00000e+00, -2.00000e+00, 1.00000e+00, -1.61444e+00, 9.45725e-01 );
+    BiQuad bqx1( 1.65685e-04, -3.31369e-04, 1.65685e-04, -5.58311e-01, 7.93152e-01 );
+    BiQuad bqx2( 1.00000e+00, 2.00013e+00, 1.00013e+00, -7.19593e-01, 7.99753e-01 );
+    BiQuad bqx3( 1.00000e+00, 1.99987e+00, 9.99873e-01, -4.69624e-01, 9.07599e-01 );
+    BiQuad bqx4( 1.00000e+00, -2.00000e+00, 1.00000e+00, -8.76067e-01, 9.14902e-01 );
 
     BiQuadChain bcg_isolation_y;
-    BiQuad bqy1( 3.48624e-05, -6.97248e-05, 3.48624e-05, -1.42500e+00, 8.55705e-01 );
-    BiQuad bqy2( 1.00000e+00, 2.00013e+00, 1.00013e+00, -1.50474e+00, 8.66039e-01 );
-    BiQuad bqy3( 1.00000e+00, 1.99987e+00, 9.99873e-01, -1.42640e+00, 9.34678e-01 );
-    BiQuad bqy4( 1.00000e+00, -2.00000e+00, 1.00000e+00, -1.61444e+00, 9.45725e-01 );
+    BiQuad bqy1( 1.65685e-04, -3.31369e-04, 1.65685e-04, -5.58311e-01, 7.93152e-01 );
+    BiQuad bqy2( 1.00000e+00, 2.00013e+00, 1.00013e+00, -7.19593e-01, 7.99753e-01 );
+    BiQuad bqy3( 1.00000e+00, 1.99987e+00, 9.99873e-01, -4.69624e-01, 9.07599e-01 );
+    BiQuad bqy4( 1.00000e+00, -2.00000e+00, 1.00000e+00, -8.76067e-01, 9.14902e-01 );
 
     BiQuadChain bcg_isolation_z;
-    BiQuad bqz1( 3.48624e-05, -6.97248e-05, 3.48624e-05, -1.42500e+00, 8.55705e-01 );
-    BiQuad bqz2( 1.00000e+00, 2.00013e+00, 1.00013e+00, -1.50474e+00, 8.66039e-01 );
-    BiQuad bqz3( 1.00000e+00, 1.99987e+00, 9.99873e-01, -1.42640e+00, 9.34678e-01 );
-    BiQuad bqz4( 1.00000e+00, -2.00000e+00, 1.00000e+00, -1.61444e+00, 9.45725e-01 );
+    BiQuad bqz1( 1.65685e-04, -3.31369e-04, 1.65685e-04, -5.58311e-01, 7.93152e-01 );
+    BiQuad bqz2( 1.00000e+00, 2.00013e+00, 1.00013e+00, -7.19593e-01, 7.99753e-01 );
+    BiQuad bqz3( 1.00000e+00, 1.99987e+00, 9.99873e-01, -4.69624e-01, 9.07599e-01 );
+    BiQuad bqz4( 1.00000e+00, -2.00000e+00, 1.00000e+00, -8.76067e-01, 9.14902e-01 );
 
     bcg_isolation_x.add( &bqx1 ).add( &bqx2 ).add( &bqx3 ).add( &bqx4 );
     bcg_isolation_y.add( &bqy1 ).add( &bqy2 ).add( &bqy3 ).add( &bqy4 );
@@ -64,8 +64,8 @@ bool BCG::bcg(const seconds num_seconds)
 
     // Init 2nd order bandpass (0.75-2.5 Hz) Butterworth filter
     BiQuadChain hr_isolation;
-    BiQuad bq5( 2.58488e-03, -5.16976e-03, 2.58488e-03, -1.88131e+00, 8.98067e-01 );
-    BiQuad bq6( 1.00000e+00, 2.00000e+00, 1.00000e+00, -1.95665e+00, 9.59238e-01 );
+    BiQuad bq5( 9.50961e-03, -1.90192e-02, 9.50961e-03, -1.74530e+00, 8.08313e-01 );
+    BiQuad bq6( 1.00000e+00, 2.00000e+00, 1.00000e+00, -1.91014e+00, 9.20257e-01 );
 
     hr_isolation.add( &bq5 ).add ( &bq6 );
 
@@ -78,6 +78,8 @@ bool BCG::bcg(const seconds num_seconds)
     imu.set_g_odr(G_FREQUENCY);
     imu.set_g_fs(G_FULL_SCALE);
     imu.enable_g();
+    imu.enable_x(); // TODO remove
+    imu.set_x_odr(G_FREQUENCY); // TODO remove
     imu.enable_int1_drdy_g();
 
     // let gyroscope warm up
@@ -96,9 +98,11 @@ bool BCG::bcg(const seconds num_seconds)
 
     #ifdef BCG_LOGGING
     {
-        _logger->log(TRACE_WARNING, "ts, x, y, z, x_filt, y_filt, z_filt, l2norm, bcg");
+        _logger->log(TRACE_WARNING, "ts, a_x, a_y, a_z, g_x, g_y, g_z, x_filt, y_filt, z_filt, l2norm, bcg");
     }
     #endif // BCG_LOGGING
+
+    // TODO add timeout to IMU
 
     // acquire and process samples until num_seconds has elapsed
     while(zc_timer.elapsed_time() <= duration_cast<microseconds>(num_seconds))
@@ -111,6 +115,9 @@ bool BCG::bcg(const seconds num_seconds)
             double x = gyr[0];
             double y = gyr[1];
             double z = gyr[2];
+
+            float acc[3] = {0};
+            imu.get_x_axes_f(acc);
 
             acquired_samples++;
 
@@ -127,7 +134,7 @@ bool BCG::bcg(const seconds num_seconds)
 
             #ifdef BCG_LOGGING
             {
-                _logger->log(TRACE_WARNING, "%i, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f", zc_timer.read_ms(), x, y, z, xfilt, yfilt, zfilt, mag, next_bcg_val);
+                _logger->log(TRACE_WARNING, "%i, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f", zc_timer.read_ms(), acc[0], acc[1], acc[2], x, y, z, xfilt, yfilt, zfilt, mag, next_bcg_val);
             }
             #endif // BCG_LOGGING
 

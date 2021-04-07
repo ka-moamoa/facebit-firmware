@@ -38,7 +38,7 @@ private:
     const uint8_t HR_BUFFER_SIZE = 20; // how many heart rates we want to store on device
     vector<HR_t> _HR;
 
-    const float G_FREQUENCY = 104.0; // Hz
+    const float G_FREQUENCY = 51.0; // Hz
     const float G_FULL_SCALE = 124.0; // max sensitivity
 
     /**
