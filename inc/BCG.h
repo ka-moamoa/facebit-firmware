@@ -49,11 +49,12 @@ private:
      * STD_DEV_THRESHOLD before we calculate 
      * a heart rate based on them.
      */
-    uint8_t NUM_EVENTS = 4; // number of sequential events
-    float STD_DEV_THRESHOLD = 5.0; // in BPM
+    uint8_t NUM_EVENTS = 5; // number of sequential events
+    const float STD_DEV_THRESHOLD = 20.0; // in BPM
+    const float OUTLIER_THRESHOLD = 3.0; // standard deviations
 
-    uint8_t MIN_HR = 45; // BPM below this limit are filtered out during the HR_isolation stage
-    uint8_t MAX_HR = 150; // BPM above this limit are filtered out during the HR_isolation stage
+    const uint8_t MIN_HR = 45; // BPM below this limit are filtered out during the HR_isolation stage
+    const uint8_t MAX_HR = 150; // BPM above this limit are filtered out during the HR_isolation stage
 
     double _l2norm(double x, double y, double z);
 };

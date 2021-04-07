@@ -90,9 +90,10 @@ bool BCG::bcg(const seconds num_seconds)
 
     // init some tracker variables
     float last_bcg_val = -1.0;
-    uint32_t acquired_samples = 0;
     vector<double> last_crosses;
+    vector<double> rates;
     bool new_hr_reading = false;
+    bool initialized = false;
 
     LowPowerTimer zc_timer;
     zc_timer.start();
@@ -101,7 +102,7 @@ bool BCG::bcg(const seconds num_seconds)
 
     #ifdef BCG_LOGGING
     {
-        _logger->log(TRACE_WARNING, "ts, a_x, a_y, a_z, g_x, g_y, g_z, x_filt, y_filt, z_filt, l2norm, bcg");
+        _logger->log(TRACE_WARNING, "ts, g_x, g_y, g_z, x_filt, y_filt, z_filt, l2norm, bcg");
     }
     #endif // BCG_LOGGING
 
@@ -119,10 +120,15 @@ bool BCG::bcg(const seconds num_seconds)
             double y = gyr[1];
             double z = gyr[2];
 
-            float acc[3] = {0};
-            imu.get_x_axes_f(acc);
-
-            acquired_samples++;
+            if (!initialized) // prime the bcg isolation filters
+            {
+                for (int i = 0; i < G_FREQUENCY * 5; i++)
+                {
+                    bcg_isolation_x.step(x);
+                    bcg_isolation_y.step(y);
+                    bcg_isolation_z.step(z);
+                }
+            }
 
             // put each axis through bcg features isolation filter
             double xfilt = bcg_isolation_x.step(x);
@@ -132,12 +138,23 @@ bool BCG::bcg(const seconds num_seconds)
             // l2norm the signal
             double mag = _l2norm(xfilt, yfilt, zfilt);
 
+            // prime the hr isolation filter
+            if (!initialized)
+            {
+                for (int i = 0; i < G_FREQUENCY * 5; i++)
+                {
+                    hr_isolation.step(mag);
+                }
+
+                initialized = true;
+            } 
+
             // send l2norm through hr isolation filter
             float next_bcg_val = hr_isolation.step(mag);
 
             #ifdef BCG_LOGGING
             {
-                _logger->log(TRACE_WARNING, "%i, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f", zc_timer.read_ms(), acc[0], acc[1], acc[2], x, y, z, xfilt, yfilt, zfilt, mag, next_bcg_val);
+                _logger->log(TRACE_WARNING, "%i, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f", zc_timer.read_ms(), x, y, z, xfilt, yfilt, zfilt, mag, next_bcg_val);
             }
             #endif // BCG_LOGGING
 
@@ -168,25 +185,12 @@ bool BCG::bcg(const seconds num_seconds)
                     if (std_dev < STD_DEV_THRESHOLD) // we have some stable readings! calculate heart rate
                     {
                         float rate_raw = Utilities::mean(crosses_copy);
-                        uint8_t rate = (uint8_t)Utilities::round(rate_raw);
 
                         // bounds checking
-                        if (rate >= MIN_HR && rate <= MAX_HR)
+                        if (rate_raw >= MIN_HR && rate_raw <= MAX_HR)
                         {
-                            new_hr_reading = true;
-
-                            HR_t new_hr;
-                            new_hr.rate = rate;
-                            new_hr.timestamp = time(NULL);
-
-                            // _logger->log(TRACE_INFO, "New HR reading --> rate: %0.1f, time: %lli", rate_raw, new_hr.timestamp);
-
-                            while (_HR.size() >= HR_BUFFER_SIZE)
-                            {
-                                _HR.erase(_HR.begin());
-                            }
-
-                            _HR.push_back(new_hr);
+                            rates.push_back(rate_raw);
+                            _logger->log(TRACE_INFO, "New HR reading --> rate: %0.1f, time: %lli", rate_raw, time(NULL));
                         }
                     }
 
@@ -202,6 +206,38 @@ bool BCG::bcg(const seconds num_seconds)
         }
         
         ThisThread::sleep_for(1ms);
+    }
+
+    if (rates.size() > 0)
+    {
+        float average_rate = Utilities::mean(rates);
+        float std_dev_rate = Utilities::std_dev(rates);
+        _logger->log(TRACE_INFO, "average HR before outlier detection = %0.1f, std_dev = %0.1f", average_rate, std_dev_rate);
+        
+        for (int i = 0; i < rates.size(); i++)
+        {
+            float z_score = (rates[i] - average_rate) / std_dev_rate;
+            _logger->log(TRACE_TRACE, "rate = %0.1f, z-score = %0.1f --> %s", rates[i], z_score, z_score > OUTLIER_THRESHOLD ? "ERASE" : "KEEP");
+            if (z_score > OUTLIER_THRESHOLD) rates.erase(rates.begin() + i); // delete any outliers
+        }
+
+        average_rate = Utilities::mean(rates);
+        std_dev_rate = Utilities::std_dev(rates);
+        _logger->log(TRACE_INFO, "average HR after outlier detection = %0.1f, std_dev = %0.1f", average_rate, std_dev_rate);
+    
+        HR_t new_hr;
+        new_hr.rate = average_rate;
+        new_hr.timestamp = time(NULL);
+
+
+        while (_HR.size() >= HR_BUFFER_SIZE)
+        {
+            _HR.erase(_HR.begin());
+        }
+
+        _HR.push_back(new_hr);
+
+        new_hr_reading = true;
     }
 
     _bus_control->spi_power(false);
