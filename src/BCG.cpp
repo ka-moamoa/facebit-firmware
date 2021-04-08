@@ -3,7 +3,7 @@
 #include "Utilites.h"
 #include <numeric>
 
-#define BCG_LOGGING
+// #define BCG_LOGGING
 
 using namespace std::chrono;
 
