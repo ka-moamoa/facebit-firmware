@@ -124,6 +124,8 @@ typedef enum {
     P0_31 = p31,
 
     // mBed interface Pins
+    USBTX = NC,
+    USBRX = NC,
     CONSOLE_TX = NC,
     CONSOLE_RX = NC,
     STDIO_UART_TX = p18,

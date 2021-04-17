@@ -11,10 +11,11 @@ public:
     Barometer(SPI *spi, PinName cs_pin, PinName int_pin);
     ~Barometer();
 
-    const float BAROMETER_FREQUENCY = 24.0; //Hz
+    const float BAROMETER_FREQUENCY = 24.0; // Hz
     const uint16_t MAX_ALLOWABLE_SIZE = 200; //This is a little arbitrary, just want to have a cap on the buffer size.
 
     bool initialize();
+    bool set_frequency(uint8_t frequency);
     bool update();
 
     bool set_fifo_full_interrupt(bool enable);

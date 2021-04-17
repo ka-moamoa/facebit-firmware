@@ -5,8 +5,7 @@ using namespace std::chrono;
 
 Barometer::Barometer(SPI *spi, PinName cs_pin, PinName int_pin) :
 _barometer(spi, cs_pin),
-_int_pin(int_pin),
-_t_barometer()
+_int_pin(int_pin, PullNone)
 {
     _logger = Logger::get_instance();
 }
@@ -61,6 +60,16 @@ bool Barometer::initialize()
     _logger->log(TRACE_TRACE, "%s", "Barometer initialized successfully");
     _t_barometer.start();
     _initialized = true;
+    return true;
+}
+
+bool Barometer::set_frequency(uint8_t frequency)
+{
+    if (_barometer.set_odr((float)frequency - 0.1) == LPS22HB_ERROR) // - 0.1 because they try to compare floats in the driver 
+    {
+        return false;
+    }
+
     return true;
 }
 

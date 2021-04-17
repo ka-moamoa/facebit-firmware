@@ -18,13 +18,19 @@ public:
         uint64_t timestamp;
     } RR_t;
 
+    typedef enum
+    {
+        THERMOMETER,
+        BAROMETER
+    } RespSource_t;
+
     RespiratoryRate(Si7051 &temp, Barometer &barometer);
     ~RespiratoryRate();
 
     RR_t get_buffer_element();
     uint8_t get_buffer_size() { return respiratory_rate_buffer.size(); };
 
-    float respiratory_rate(const seconds num_seconds);
+    float respiratory_rate(const uint8_t num_seconds, RespSource_t source);
     
 private:
     Si7051 &_temp;
@@ -36,6 +42,8 @@ private:
     vector<RR_t> respiratory_rate_buffer;
 
     const int8_t ERROR = -1;
+    const uint8_t BUFFER = 1; // second
+    const uint8_t FREQUENCY = 10; // hz
 };
 
 
