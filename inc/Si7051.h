@@ -55,6 +55,7 @@ public:
 	Si7051(I2C *i2c, char address = SI7051_ADDRESS);
 
 	void initialize();
+	void stop();
 	void setResolution(uint8_t resolution);
 	
 	void setFrequency(uint8_t frequency_Hz) { _measurement_frequency_hz = frequency_Hz; };

@@ -157,34 +157,36 @@ void FaceBitState::update_state()
 
                 case MEASURE_RESPIRATION_RATE:
                 {
-                    CapCalc* cap = CapCalc::get_instance();
                     Si7051 temp(&_i2c);
-                    RespiratoryRate resp_rate(cap, temp);
+                    Barometer barometer(&_spi, BAR_CS, BAR_DRDY);
+                    RespiratoryRate resp_rate(temp, barometer);
 
                     _logger->log(TRACE_INFO, "RESP RATE MEASUREMENT");
 
                     _last_rr_ts = _state_timer.read_ms();
 
-                    if(resp_rate.get_resp_rate())
+                    float rate = resp_rate.respiratory_rate(30, RespiratoryRate::THERMOMETER);
+
+                    if(rate != -1)
                     {
-                        if (resp_rate.get_buffer_size())
-                        {
-                            _logger->log(TRACE_INFO, "Respiration rate success");
+                        _logger->log(TRACE_INFO, "Respiration rate success");
 
-                            RespiratoryRate::RR_t rr = resp_rate.get_buffer_element();
+                        FaceBitData rr_data;
+                        rr_data.data_type = RESPIRATORY_RATE;
+                        rr_data.timestamp = _state_timer.read_ms();
+                        rr_data.value = rate;
 
-                            FaceBitData rr_data;
-                            rr_data.data_type = RESPIRATORY_RATE;
-                            rr_data.timestamp = rr.timestamp;
-                            rr_data.value = rr.rate;
-
-                            data_buffer.push_back(rr_data);
-                        }
-
+                        data_buffer.push_back(rr_data);
                     }
                     else
                     {
-                        _logger->log(TRACE_INFO, "Respiration rate failure");
+                        _logger->log(TRACE_INFO, "Respiratory rate failure");
+                        FaceBitData rr_failure;
+                        rr_failure.data_type = RESPIRATORY_RATE;
+                        rr_failure.timestamp = _state_timer.read_ms();
+                        rr_failure.value = RESP_RATE_FAILURE;
+
+                        data_buffer.push_back(rr_failure);
                     }
 
                     _next_task_state = IDLE;
@@ -219,7 +221,7 @@ void FaceBitState::update_state()
 
                         hr_data.data_type = HEART_RATE;
                         hr_data.timestamp = time(NULL);
-                        hr_data.value = 255;
+                        hr_data.value = HR_FAILURE;
 
                         data_buffer.push_back(hr_data);                       
                     }
@@ -365,7 +367,7 @@ bool FaceBitState::_sync_data()
             system_reset();
         }
 
-        ThisThread::sleep_for(100ms);
+        ThisThread::sleep_for(500ms);
     }
 
     // sync timestamp

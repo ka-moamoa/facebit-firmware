@@ -26,7 +26,6 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
-
 */
 
 #include "Si7051.h"
@@ -50,6 +49,11 @@ void Si7051::initialize() {
 
 	_timer.reset();
 	_timer.start();
+}
+
+void Si7051::stop() {
+	_frequency_timer.stop();
+	_timer.stop();
 }
 
 void Si7051::reset()
@@ -139,7 +143,7 @@ float Si7051::readTemperature()
 	ack = false;
 
 	// TODO: this isn't working right now. The device should nack until a measurement is ready, but it seems to ack before it's ready and we're getting erroneous results. 
-	// the workaround is to sleep_for > 4 ms or so (probably 10 is safer), to just give it time to finish the measurement.
+	// the workaround is to sleep_for 10ms or so, to just give it time to finish the measurement.
 	while (ack == false && std::chrono::duration_cast<std::chrono::milliseconds>(timeout.elapsed_time()).count() < MEASUREMENT_TIMEOUT_MS) // the device will nack read requests until the measurement is ready
 	{
 		ThisThread::sleep_for(10ms);
@@ -167,9 +171,10 @@ float Si7051::readTemperature()
 
 bool Si7051::update()
 {
-	float measurement_period = 1.0 / (float)_measurement_frequency_hz;
+	uint16_t measurement_period = 1000 / _measurement_frequency_hz;
+	uint32_t ms_since_last_read = _frequency_timer.read_ms();
 
-	if (_frequency_timer.read() >= measurement_period)
+	if (ms_since_last_read >= measurement_period - 10) // 10 ms to perform measurement
 	{
 		float tempVal = readTemperature();
 		uint16_t tempValx100 = (uint16_t)Utilities::round(tempVal * 100.0);

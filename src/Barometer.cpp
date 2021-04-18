@@ -5,8 +5,7 @@ using namespace std::chrono;
 
 Barometer::Barometer(SPI *spi, PinName cs_pin, PinName int_pin) :
 _barometer(spi, cs_pin),
-_int_pin(int_pin),
-_t_barometer()
+_int_pin(int_pin, PullNone)
 {
     _logger = Logger::get_instance();
 }
@@ -61,6 +60,16 @@ bool Barometer::initialize()
     _logger->log(TRACE_TRACE, "%s", "Barometer initialized successfully");
     _t_barometer.start();
     _initialized = true;
+    return true;
+}
+
+bool Barometer::set_frequency(uint8_t frequency)
+{
+    if (_barometer.set_odr((float)frequency - 0.1) == LPS22HB_ERROR) // - 0.1 because they try to compare floats in the driver 
+    {
+        return false;
+    }
+
     return true;
 }
 
@@ -147,6 +156,11 @@ uint64_t Barometer::get_delta_timestamp(bool broadcast)
     return delta_t;
 }
 
+float Barometer::convert_to_hpa(uint16_t raw_data)
+{
+  return ((float)raw_data + 80000.0) / 100.0;
+}
+
 bool Barometer::read_buffered_data()
 {
     if (_barometer.get_fifo(_pressure_buffer, _temperature_buffer) == LPS22HB_ERROR)
@@ -173,6 +187,8 @@ bool Barometer::read_buffered_data()
 
 void Barometer::set_max_buffer_size(uint16_t size)
 {
+    if (size > MAX_ALLOWABLE_SIZE) size = MAX_ALLOWABLE_SIZE;
+
     _max_buffer_size = size;
 }
 

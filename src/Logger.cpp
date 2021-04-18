@@ -32,6 +32,7 @@ void Logger::initialize(UnbufferedSerial* serial, trace_level_t trace_level)
     _serial = serial;
     _serial->baud(115200);
     _serial->enable_input(false);
+    _serial->enable_output(false);
 
     _trace_level = trace_level;
 

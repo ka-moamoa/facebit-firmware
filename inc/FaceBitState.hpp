@@ -104,6 +104,9 @@ private:
     uint32_t _last_mf_ts = 0;
     uint32_t _last_ble_ts = 0;
 
+    const uint8_t RESP_RATE_FAILURE = 255;
+    const uint8_t HR_FAILURE = 255;
+
     bool _ble_initialized = false;
 
     bool _get_imu_int();
