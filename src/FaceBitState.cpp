@@ -20,7 +20,8 @@ _spi(SPI_MOSI, SPI_MISO, SPI_SCK),
 _i2c(I2C_SDA0, I2C_SCL0),
 _imu_cs(IMU_CS),
 _smart_ppe_ble(smart_ppe_ble),
-_imu_interrupt(imu_interrupt)
+_imu_interrupt(imu_interrupt),
+_fram(&_spi, FRAM_CS)
 {
     _logger = Logger::get_instance();
     _bus_control = BusControl::get_instance();
@@ -37,15 +38,6 @@ void FaceBitState::run()
 
     state_timer.start();
 
-    BLE &_ble = BLE::Instance();
-    GattServerProcess _ble_process(ble_queue, _ble);
-    _ble_process.on_init(callback(_smart_ppe_ble, &SmartPPEService::start));
-    
-    _ble_thread.start(callback(&_ble_process, &GattServerProcess::run));
-    
-    _force_update = true;
-    _sync_data(&_ble_process);
-
     while(1)
     {
         uint32_t ts = state_timer.read_ms();
@@ -55,7 +47,7 @@ void FaceBitState::run()
         
         if (ts - _last_ble_ts > BLE_BROADCAST_PERIOD)
         {
-            _sync_data(&_ble_process);
+            _sync_data();
             _last_ble_ts = ts;
         }
 
@@ -305,8 +297,14 @@ bool FaceBitState::_get_imu_int()
     return tmp;
 }
 
-bool FaceBitState::_sync_data(GattServerProcess *_ble_process)
-{    
+bool FaceBitState::_sync_data()
+{
+    BLE &_ble = BLE::Instance();
+    GattServerProcess _ble_process(ble_queue, _ble);
+    _ble_process.on_init(callback(_smart_ppe_ble, &SmartPPEService::start));
+
+    _ble_thread.start(callback(&_ble_process, &GattServerProcess::run));
+
     if (data_buffer.size() == 0 && _force_update == false)
     {
         _logger->log(TRACE_DEBUG, "%s", "NO DATA TO SEND");
@@ -321,17 +319,17 @@ bool FaceBitState::_sync_data(GattServerProcess *_ble_process)
     // wait for connection
     LowPowerTimer ble_timeout;
     ble_timeout.start();
-    while(!_ble_process->is_connected())
+    while(!_ble_process.is_connected())
     {
         Thread::State state = _ble_thread.get_state();
-        uint16_t size = _ble_process->event_queue_size;
+        uint16_t size = _ble_process.event_queue_size;
         // _logger->log(TRACE_TRACE, "Thread state = %u, equeue size = %u", state, size);
         
         if (ble_timeout.read_ms() > BLE_CONNECTION_TIMEOUT)
         {
             _logger->log(TRACE_INFO, "%s", "TIMEOUT BEFORE BLE CONNECTION");
             _ble_thread.flags_set(STOP_BLE);
-            return false;
+            system_reset();
         }
 
         ThisThread::sleep_for(10ms);
@@ -357,7 +355,7 @@ bool FaceBitState::_sync_data(GattServerProcess *_ble_process)
         {
             _logger->log(TRACE_INFO, "%s", "BLE DATA READY TIMEOUT (MASK ON)");
             _ble_thread.flags_set(STOP_BLE);
-            return false;
+            system_reset();
         }
 
         ThisThread::sleep_for(100ms);
@@ -437,6 +435,8 @@ bool FaceBitState::_sync_data(GattServerProcess *_ble_process)
     _force_update = false;
 
     _ble_thread.flags_set(STOP_BLE);
+
+    system_reset();
 
     return true;
 }

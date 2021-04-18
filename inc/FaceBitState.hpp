@@ -9,6 +9,7 @@
 #include "gatt_server_process.h"
 #include "SmartPPEService.h"
 #include "Logger.h"
+#include "FRAM.h"
 
 using namespace std::chrono;
 
@@ -49,6 +50,7 @@ private:
     I2C _i2c;
     BusControl* _bus_control;
     Logger* _logger;
+    FRAM _fram;
 
     SmartPPEService* _smart_ppe_ble;
     static Thread _ble_thread;
@@ -86,7 +88,7 @@ private:
     const uint32_t RR_PERIOD = 10000;// * 60 * 1000; // 5 min
     const uint32_t HR_PERIOD = 10000;//1 * 60 * 1000; // 1 min
     // const uint32_t MASK_FIT_PERIOD = 5000;//1 * 60 * 1000; // 1 min
-    const uint32_t BLE_BROADCAST_PERIOD = 60000;//5 * 60 * 1000; // 5 min
+    const uint32_t BLE_BROADCAST_PERIOD = 15000;//5 * 60 * 1000; // 5 min
 
     const uint32_t BLE_CONNECTION_TIMEOUT = 5000;
     const uint32_t BLE_DRDY_TIMEOUT = 5000;
@@ -103,7 +105,7 @@ private:
     bool _ble_initialized = false;
 
     bool _get_imu_int();
-    bool _sync_data(GattServerProcess *_ble_process);
+    bool _sync_data();
 };
 
 
