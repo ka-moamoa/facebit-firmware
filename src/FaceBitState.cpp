@@ -80,7 +80,7 @@ void FaceBitState::update_state(uint32_t ts)
 
                 imu.enable_x();
                 imu.enable_wake_up_detection(_wakeup_int_pin);
-                imu.set_wake_up_threshold(LSM6DSL_WAKE_UP_THRESHOLD_MID_LOW);
+                imu.set_wake_up_threshold(LSM6DSL_WAKE_UP_THRESHOLD_LOW);
 
                 _bus_control->set_power_lock(BusControl::IMU, true);
                 _bus_control->spi_power(false);
