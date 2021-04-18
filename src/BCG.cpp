@@ -3,6 +3,8 @@
 #include "Utilites.h"
 #include <numeric>
 
+// #define BCG_LOGGING
+
 using namespace std::chrono;
 
 BCG::BCG(SPI *spi, PinName int1_pin, PinName cs) : 
@@ -30,6 +32,9 @@ bool BCG::bcg(const seconds num_seconds)
     // turn on SPI bus
     _bus_control->spi_power(true);
 
+    // Give time for the chip to turn on
+    ThisThread::sleep_for(10ms);
+
     /**
      * @brief Init 4th order bandpass (10-13 Hz) Butterworth filters
      * 
@@ -39,22 +44,22 @@ bool BCG::bcg(const seconds num_seconds)
      * generated with MATLAB assuming 104 Hz sampling frequency.
      */
     BiQuadChain bcg_isolation_x;
-    BiQuad bqx1( 3.48624e-05, -6.97248e-05, 3.48624e-05, -1.42500e+00, 8.55705e-01 );
-    BiQuad bqx2( 1.00000e+00, 2.00013e+00, 1.00013e+00, -1.50474e+00, 8.66039e-01 );
-    BiQuad bqx3( 1.00000e+00, 1.99987e+00, 9.99873e-01, -1.42640e+00, 9.34678e-01 );
-    BiQuad bqx4( 1.00000e+00, -2.00000e+00, 1.00000e+00, -1.61444e+00, 9.45725e-01 );
+    BiQuad bqx1( 6.76087639e-04,  1.35217528e-03,  6.76087639e-04,  1.00000000e+00, -2.16739514e-01,  7.10632547e-01);
+    BiQuad bqx2( 1.00000000e+00,  2.00000000e+00,  1.00000000e+00,  1.00000000e+00, -4.54393846e-01,  7.17539837e-01);
+    BiQuad bqx3( 1.00000000e+00, -2.00000000e+00,  1.00000000e+00,  1.00000000e+00, -5.35180090e-02,  8.69556033e-01);
+    BiQuad bqx4( 1.00000000e+00, -2.00000000e+00,  1.00000000e+00,  1.00000000e+00, -6.64197076e-01,  8.77428070e-01);
 
     BiQuadChain bcg_isolation_y;
-    BiQuad bqy1( 3.48624e-05, -6.97248e-05, 3.48624e-05, -1.42500e+00, 8.55705e-01 );
-    BiQuad bqy2( 1.00000e+00, 2.00013e+00, 1.00013e+00, -1.50474e+00, 8.66039e-01 );
-    BiQuad bqy3( 1.00000e+00, 1.99987e+00, 9.99873e-01, -1.42640e+00, 9.34678e-01 );
-    BiQuad bqy4( 1.00000e+00, -2.00000e+00, 1.00000e+00, -1.61444e+00, 9.45725e-01 );
+    BiQuad bqy1( 6.76087639e-04,  1.35217528e-03,  6.76087639e-04,  1.00000000e+00, -2.16739514e-01,  7.10632547e-01);
+    BiQuad bqy2( 1.00000000e+00,  2.00000000e+00,  1.00000000e+00,  1.00000000e+00, -4.54393846e-01,  7.17539837e-01);
+    BiQuad bqy3( 1.00000000e+00, -2.00000000e+00,  1.00000000e+00,  1.00000000e+00, -5.35180090e-02,  8.69556033e-01);
+    BiQuad bqy4( 1.00000000e+00, -2.00000000e+00,  1.00000000e+00,  1.00000000e+00, -6.64197076e-01,  8.77428070e-01);
 
     BiQuadChain bcg_isolation_z;
-    BiQuad bqz1( 3.48624e-05, -6.97248e-05, 3.48624e-05, -1.42500e+00, 8.55705e-01 );
-    BiQuad bqz2( 1.00000e+00, 2.00013e+00, 1.00013e+00, -1.50474e+00, 8.66039e-01 );
-    BiQuad bqz3( 1.00000e+00, 1.99987e+00, 9.99873e-01, -1.42640e+00, 9.34678e-01 );
-    BiQuad bqz4( 1.00000e+00, -2.00000e+00, 1.00000e+00, -1.61444e+00, 9.45725e-01 );
+    BiQuad bqz1( 6.76087639e-04,  1.35217528e-03,  6.76087639e-04,  1.00000000e+00, -2.16739514e-01,  7.10632547e-01);
+    BiQuad bqz2( 1.00000000e+00,  2.00000000e+00,  1.00000000e+00,  1.00000000e+00, -4.54393846e-01,  7.17539837e-01);
+    BiQuad bqz3( 1.00000000e+00, -2.00000000e+00,  1.00000000e+00,  1.00000000e+00, -5.35180090e-02,  8.69556033e-01);
+    BiQuad bqz4( 1.00000000e+00, -2.00000000e+00,  1.00000000e+00,  1.00000000e+00, -6.64197076e-01,  8.77428070e-01);
 
     bcg_isolation_x.add( &bqx1 ).add( &bqx2 ).add( &bqx3 ).add( &bqx4 );
     bcg_isolation_y.add( &bqy1 ).add( &bqy2 ).add( &bqy3 ).add( &bqy4 );
@@ -62,41 +67,42 @@ bool BCG::bcg(const seconds num_seconds)
 
     // Init 2nd order bandpass (0.75-2.5 Hz) Butterworth filter
     BiQuadChain hr_isolation;
-    BiQuad bq5( 2.58488e-03, -5.16976e-03, 2.58488e-03, -1.88131e+00, 8.98067e-01 );
-    BiQuad bq6( 1.00000e+00, 2.00000e+00, 1.00000e+00, -1.95665e+00, 9.59238e-01 );
+    BiQuad bq5( 0.00952329,  0.01904657,  0.00952329,  1., -1.74516121,  0.8078649 );
+    BiQuad bq6( 1.,          -2.,         1.,          1., -1.91061565,  0.92055723 );
 
     hr_isolation.add( &bq5 ).add ( &bq6 );
 
-    // Give time for the chip to turn on
-    ThisThread::sleep_for(10ms);
-
     // Set up gyroscope
     LSM6DSLSensor imu(_spi, _cs);
-    imu.init(NULL);
-    imu.set_g_odr(G_FREQUENCY);
-    imu.set_g_fs(G_FULL_SCALE);
-    imu.enable_g();
-    imu.enable_int1_drdy_g();
-
-    // let gyroscope warm up
-    ThisThread::sleep_for(500ms);
+    _init_imu(imu);
 
     // init some tracker variables
     float last_bcg_val = -1.0;
-    uint32_t acquired_samples = 0;
     vector<double> last_crosses;
+    vector<double> rates;
     bool new_hr_reading = false;
+    bool initialized = false;
 
+    LowPowerTimer timeout;
+    timeout.start();
     LowPowerTimer zc_timer;
     zc_timer.start();
 
     _logger->log(TRACE_INFO, "%s", "SENSING HR");
 
+    #ifdef BCG_LOGGING
+    {
+        _logger->log(TRACE_WARNING, "ts, g_x, g_y, g_z, x_filt, y_filt, z_filt, l2norm, bcg");
+    }
+    #endif // BCG_LOGGING
+
     // acquire and process samples until num_seconds has elapsed
     while(zc_timer.elapsed_time() <= duration_cast<microseconds>(num_seconds))
     {
         if (_g_drdy.read())        
-        {
+        {   
+            timeout.reset();
+
             // get samples
             float gyr[3] = {0};
             imu.get_g_axes_f(gyr);
@@ -104,22 +110,44 @@ bool BCG::bcg(const seconds num_seconds)
             double y = gyr[1];
             double z = gyr[2];
 
-            acquired_samples++;
+            if (!initialized) // prime the bcg isolation filters
+            {
+                for (int i = 0; i < G_FREQUENCY * 5; i++)
+                {
+                    bcg_isolation_x.step(x);
+                    bcg_isolation_y.step(y);
+                    bcg_isolation_z.step(z);
+                }
+            }
 
             // put each axis through bcg features isolation filter
-            x = bcg_isolation_x.step(x);
-            y = bcg_isolation_y.step(y);
-            z = bcg_isolation_z.step(z);
+            double xfilt = bcg_isolation_x.step(x);
+            double yfilt = bcg_isolation_y.step(y);
+            double zfilt = bcg_isolation_z.step(z);
             
             // l2norm the signal
-            double mag = _l2norm(x, y, z);
+            double mag = _l2norm(xfilt, yfilt, zfilt);
 
-            // printf("%f, ", mag);
+            // prime the hr isolation filter
+            if (!initialized)
+            {
+                for (int i = 0; i < G_FREQUENCY * 5; i++)
+                {
+                    hr_isolation.step(mag);
+                }
+
+                initialized = true;
+            } 
 
             // send l2norm through hr isolation filter
             float next_bcg_val = hr_isolation.step(mag);
-            // _logger->log(TRACE_INFO, "bcg val = %0.2f", next_bcg_val);
-            
+
+            #ifdef BCG_LOGGING
+            {
+                _logger->log(TRACE_WARNING, "%i, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f", zc_timer.read_ms(), x, y, z, xfilt, yfilt, zfilt, mag, next_bcg_val);
+            }
+            #endif // BCG_LOGGING
+
             // look for a descending zero-cross
             if (last_bcg_val > 0 && next_bcg_val <= 0)
             {
@@ -147,25 +175,12 @@ bool BCG::bcg(const seconds num_seconds)
                     if (std_dev < STD_DEV_THRESHOLD) // we have some stable readings! calculate heart rate
                     {
                         float rate_raw = Utilities::mean(crosses_copy);
-                        uint8_t rate = (uint8_t)Utilities::round(rate_raw);
 
                         // bounds checking
-                        if (rate >= MIN_HR && rate <= MAX_HR)
+                        if (rate_raw >= MIN_HR && rate_raw <= MAX_HR)
                         {
-                            new_hr_reading = true;
-
-                            HR_t new_hr;
-                            new_hr.rate = rate;
-                            new_hr.timestamp = time(NULL);
-
-                            // _logger->log(TRACE_INFO, "New HR reading --> rate: %0.1f, time: %lli", rate_raw, new_hr.timestamp);
-
-                            while (_HR.size() >= HR_BUFFER_SIZE)
-                            {
-                                _HR.erase(_HR.begin());
-                            }
-
-                            _HR.push_back(new_hr);
+                            rates.push_back(rate_raw);
+                            _logger->log(TRACE_INFO, "New HR reading --> rate: %0.1f, time: %lli", rate_raw, time(NULL));
                         }
                     }
 
@@ -181,10 +196,49 @@ bool BCG::bcg(const seconds num_seconds)
         }
         
         ThisThread::sleep_for(1ms);
+        if (timeout.read() > IMU_TIMEOUT)
+        {
+            _logger->log(TRACE_WARNING, "IMU timeout during BCG. Resetting...");
+            _reset_imu(imu);
+            timeout.reset();
+        }
+    }
+
+    if (rates.size() > 0)
+    {
+        float average_rate = Utilities::mean(rates);
+        float std_dev_rate = Utilities::std_dev(rates);
+        _logger->log(TRACE_INFO, "average HR before outlier detection = %0.1f, std_dev = %0.1f", average_rate, std_dev_rate);
+        
+        for (int i = 0; i < rates.size(); i++)
+        {
+            float z_score = (rates[i] - average_rate) / std_dev_rate;
+            _logger->log(TRACE_TRACE, "rate = %0.1f, z-score = %0.1f --> %s", rates[i], z_score, z_score > OUTLIER_THRESHOLD ? "ERASE" : "KEEP");
+            if (z_score > OUTLIER_THRESHOLD) rates.erase(rates.begin() + i); // delete any outliers
+        }
+
+        average_rate = Utilities::mean(rates);
+        std_dev_rate = Utilities::std_dev(rates);
+        _logger->log(TRACE_INFO, "average HR after outlier detection = %0.1f, std_dev = %0.1f", average_rate, std_dev_rate);
+    
+        HR_t new_hr;
+        new_hr.rate = Utilities::round(average_rate);
+        new_hr.timestamp = time(NULL);
+
+
+        while (_HR.size() >= HR_BUFFER_SIZE)
+        {
+            _HR.erase(_HR.begin());
+        }
+
+        _HR.push_back(new_hr);
+
+        new_hr_reading = true;
     }
 
     _bus_control->spi_power(false);
     zc_timer.stop(); 
+    timeout.stop();
 
     return new_hr_reading;
 }
@@ -193,6 +247,25 @@ double BCG::_l2norm(double x, double y, double z)
 {
     double result = sqrt( (x * x) + (y * y) + (z * z) );
     return result;
+}
+
+void BCG::_init_imu(LSM6DSLSensor& imu)
+{
+    imu.init(NULL);
+    imu.set_g_odr(G_FREQUENCY);
+    imu.set_g_fs(G_FULL_SCALE);
+    imu.enable_g();
+    imu.enable_int1_drdy_g();
+}
+
+void BCG::_reset_imu(LSM6DSLSensor& imu)
+{
+    _bus_control->spi_power(false);
+    ThisThread::sleep_for(10ms);
+    _bus_control->spi_power(true);
+    ThisThread::sleep_for(10ms);
+
+    _init_imu(imu);
 }
 
 

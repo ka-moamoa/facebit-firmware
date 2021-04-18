@@ -80,12 +80,12 @@ private:
 
     milliseconds _sleep_duration = 1000ms;
 
-    milliseconds INACTIVE_SLEEP_DURATION = 10000ms;
+    milliseconds INACTIVE_SLEEP_DURATION = 5000ms;
     milliseconds ACTIVE_SLEEP_DURATION = 5000ms;
     uint32_t ACTIVE_STATE_TIMEOUT = 30000;
     milliseconds ON_FACE_SLEEP_DURATION = 1000ms;
 
-    const uint32_t RR_PERIOD = 10000;// * 60 * 1000; // 5 min
+    const uint32_t RR_PERIOD = 8 * 60 * 60 * 1000; // 8 hrs
     const uint32_t HR_PERIOD = 10000;//1 * 60 * 1000; // 1 min
     // const uint32_t MASK_FIT_PERIOD = 5000;//1 * 60 * 1000; // 1 min
     const uint32_t BLE_BROADCAST_PERIOD = 15000;//5 * 60 * 1000; // 5 min

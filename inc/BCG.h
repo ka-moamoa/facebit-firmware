@@ -38,7 +38,8 @@ private:
     const uint8_t HR_BUFFER_SIZE = 20; // how many heart rates we want to store on device
     vector<HR_t> _HR;
 
-    const float G_FREQUENCY = 104.0; // Hz
+    const uint8_t IMU_TIMEOUT = 2; // seconds
+    const float G_FREQUENCY = 51.0; // Hz
     const float G_FULL_SCALE = 124.0; // max sensitivity
 
     /**
@@ -49,13 +50,16 @@ private:
      * STD_DEV_THRESHOLD before we calculate 
      * a heart rate based on them.
      */
-    uint8_t NUM_EVENTS = 4; // number of sequential events
-    float STD_DEV_THRESHOLD = 5.0; // in BPM
+    uint8_t NUM_EVENTS = 5; // number of sequential events
+    const float STD_DEV_THRESHOLD = 20.0; // in BPM
+    const float OUTLIER_THRESHOLD = 3.0; // standard deviations
 
-    uint8_t MIN_HR = 45; // BPM below this limit are filtered out during the HR_isolation stage
-    uint8_t MAX_HR = 150; // BPM above this limit are filtered out during the HR_isolation stage
+    const uint8_t MIN_HR = 45; // BPM below this limit are filtered out during the HR_isolation stage
+    const uint8_t MAX_HR = 150; // BPM above this limit are filtered out during the HR_isolation stage
 
     double _l2norm(double x, double y, double z);
+    void _init_imu(LSM6DSLSensor& imu);
+    void _reset_imu(LSM6DSLSensor& imu);
 };
 
 #endif //BCG_H_

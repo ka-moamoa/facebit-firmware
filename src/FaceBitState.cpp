@@ -45,7 +45,7 @@ void FaceBitState::run()
         update_state(ts);
         _bus_control->set_led_blinks((uint8_t)_mask_state + 1);
         
-        if (ts - _last_ble_ts > BLE_BROADCAST_PERIOD)
+        if (ts - _last_ble_ts > BLE_BROADCAST_PERIOD && !_new_mask_state) // don't want to broadcast while we're switching states
         {
             _sync_data();
             _last_ble_ts = ts;
@@ -101,60 +101,18 @@ void FaceBitState::update_state(uint32_t ts)
         }
         case OFF_FACE_ACTIVE:
         {
-            if (_new_mask_state)
-            {
-                ACTIVE_STATE_ENTRY_TS = ts;
-                _sleep_duration = ACTIVE_SLEEP_DURATION;
-            }
-
-            Barometer barometer(&_spi, (PinName)BAR_CS, (PinName)BAR_DRDY);
-            MaskStateDetection mask_state(&barometer);
-
-            MaskStateDetection::MASK_STATE_t mask_status;
-            mask_status = mask_state.is_on(); // blocking call for ~5s
-
-            if (mask_status == MaskStateDetection::ON)
-            {
-                _logger->log(TRACE_INFO, "%s", "MASK ON");
             _next_mask_state = ON_FACE;
-            }
-            else if (mask_status == MaskStateDetection::OFF)
-            {
-                _logger->log(TRACE_INFO, "%s", "MASK OFF");
-            }
-            else if (mask_status == MaskStateDetection::ERROR)
-            {
-                _logger->log(TRACE_WARNING, "%s", "MASK DETECTION ERROR");
-            }
-
-            if(ts - ACTIVE_STATE_ENTRY_TS > ACTIVE_STATE_TIMEOUT)
-            {
-                _next_mask_state = OFF_FACE_INACTIVE;
-                _next_task_state = IDLE;
-            }
-
             break;
         }
         case ON_FACE:
         {
-            _sleep_duration = ON_FACE_SLEEP_DURATION;
+            _sleep_duration = ON_FACE_SLEEP_DURATION; // default. can be overridden by setting later in the switch statement
 
             switch(_task_state)
             {
                 case IDLE:
                 {
-                    uint32_t rr_time_over = ts - _last_rr_ts;
-                    uint32_t hr_time_over = ts - _last_hr_ts;
-
-                    if (ts - _last_rr_ts >= RR_PERIOD && (rr_time_over >= hr_time_over))
-                    {
-                        _next_task_state = MEASURE_RESPIRATION_RATE;
-                    }
-                    else if (ts - _last_hr_ts >= HR_PERIOD && (hr_time_over >= rr_time_over))
-                    {
-                        _next_task_state = MEASURE_HEART_RATE;
-                    }
-
+                    _next_task_state = MEASURE_HEART_RATE;
                     break;
                 }
 
@@ -201,7 +159,7 @@ void FaceBitState::update_state(uint32_t ts)
                     _last_hr_ts = ts;
                     BCG bcg(&_spi, (PinName)IMU_INT1, (PinName)IMU_CS);
 
-                    if(bcg.bcg(15s)) // blocking
+                    if(bcg.bcg(30s)) // blocking
                     {
                         _logger->log(TRACE_INFO, "%s", "HR CAPTURED!");
                         for(int i = 0; i < bcg.get_buffer_size(); i++)
@@ -215,6 +173,16 @@ void FaceBitState::update_state(uint32_t ts)
 
                             data_buffer.push_back(hr_data);
                         }
+                    }
+                    else
+                    {
+                        FaceBitData hr_data;
+
+                        hr_data.data_type = HEART_RATE;
+                        hr_data.timestamp = time(NULL);
+                        hr_data.value = 255;
+
+                        data_buffer.push_back(hr_data);                       
                     }
                     _next_task_state = IDLE;
                     break;
@@ -235,36 +203,6 @@ void FaceBitState::update_state(uint32_t ts)
 
     if (_mask_state == ON_FACE && _task_state != _next_task_state)
     {
-        if (_next_task_state != IDLE)
-        {
-            /**
-             * We want to run mask on/off detection before every
-             * new task, so we don't waste energy on the task (and get
-             * an inaccurate result) if the mask is off.
-             */
-            Barometer barometer(&_spi, (PinName)BAR_CS, (PinName)BAR_DRDY);
-            MaskStateDetection mask_state(&barometer);
-
-            MaskStateDetection::MASK_STATE_t mask_status;
-            mask_status = mask_state.is_on(); // blocking call for ~5s
-
-            if (mask_status == MaskStateDetection::ON)
-            {
-                _logger->log(TRACE_INFO, "%s", "MASK ON");
-            }
-            else if (mask_status == MaskStateDetection::OFF)
-            {
-                _logger->log(TRACE_INFO, "%s", "MASK OFF");
-                _next_task_state = IDLE;
-                _next_mask_state = OFF_FACE_ACTIVE;
-            }
-            else if (mask_status == MaskStateDetection::ERROR)
-            {
-                _logger->log(TRACE_WARNING, "%s", "MASK DETECTION ERROR");
-                _next_task_state = IDLE; // don't run if we don't know
-            }
-        }
-
         _new_task_state = true;
         _task_state = _next_task_state;
         _logger->log(TRACE_INFO, "TASK STATE: %i", _task_state);
@@ -307,11 +245,11 @@ bool FaceBitState::_sync_data()
 
     if (data_buffer.size() == 0 && _force_update == false)
     {
-        _logger->log(TRACE_DEBUG, "%s", "NO DATA TO SEND");
+        _logger->log(TRACE_TRACE, "NO DATA TO SEND, END BLE SYNC");
         return false;
     }
 
-    _logger->log(TRACE_DEBUG, "%s", "BLE SYNC");
+    _logger->log(TRACE_TRACE, "ATTEMPTING TO SEND %i DATA ELEMENTS", data_buffer.size());
 
     // start ble
     _ble_thread.flags_set(START_BLE);
@@ -325,17 +263,17 @@ bool FaceBitState::_sync_data()
         uint16_t size = _ble_process.event_queue_size;
         // _logger->log(TRACE_TRACE, "Thread state = %u, equeue size = %u", state, size);
         
+
         if (ble_timeout.read_ms() > BLE_CONNECTION_TIMEOUT)
         {
             _logger->log(TRACE_INFO, "%s", "TIMEOUT BEFORE BLE CONNECTION");
             _ble_thread.flags_set(STOP_BLE);
             system_reset();
         }
-
-        ThisThread::sleep_for(10ms);
+        ThisThread::sleep_for(100ms);
     }
 
-    // set mask on characteristic based on state
+    // set "mask on" characteristic
     _smart_ppe_ble->updateMaskOn(_mask_state_change_ts, _mask_state);
     _smart_ppe_ble->updateDataReady(SmartPPEService::MASK_ON);
 
