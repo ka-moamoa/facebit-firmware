@@ -44,13 +44,15 @@ public:
     };
 
     void run();
-    void update_state(uint32_t ts);
+    void update_state();
 private:
     SPI _spi;
     I2C _i2c;
     BusControl* _bus_control;
     Logger* _logger;
     FRAM _fram;
+    LowPowerTimer _state_timer;
+
 
     SmartPPEService* _smart_ppe_ble;
     static Thread _ble_thread;
