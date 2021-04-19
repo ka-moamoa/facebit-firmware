@@ -57,51 +57,11 @@ void FaceBitState::update_state()
 {
     switch(_mask_state)
     {
-        case OFF_FACE_INACTIVE:
+        case OFF_FACE:
         {
             if (_new_mask_state)
             {
-                _bus_control->spi_power(true);
-                ThisThread::sleep_for(10ms);
-            
-                LSM6DSLSensor imu(&_spi, (PinName)IMU_CS);
-                imu.init(NULL);
-
-                imu.enable_x();
-                imu.enable_wake_up_detection(_wakeup_int_pin);
-                imu.set_wake_up_threshold(LSM6DSL_WAKE_UP_THRESHOLD_LOW);
-
-                _bus_control->set_power_lock(BusControl::IMU, true);
-                _bus_control->spi_power(false);
-                
-                _sleep_duration = INACTIVE_SLEEP_DURATION;
-            }
-
-            if (_get_imu_int())
-            {
-                _logger->log(TRACE_INFO, "%s", "MOTION DETECTED");
-                _next_mask_state = OFF_FACE_ACTIVE;
-
-                _bus_control->spi_power(true);
-                ThisThread::sleep_for(10ms);
-
-                LSM6DSLSensor imu(&_spi, (PinName)IMU_CS);
-                imu.init(NULL);
-
-                imu.disable_x();
-                imu.disable_tilt_detection();
-
-                _bus_control->set_power_lock(BusControl::IMU, false);
-                _bus_control->spi_power(false);
-            }
-            break;
-        }
-        case OFF_FACE_ACTIVE:
-        {
-            if (_new_mask_state)
-            {
-                ACTIVE_STATE_ENTRY_TS = _state_timer.read_ms();
-                _sleep_duration = ACTIVE_SLEEP_DURATION;
+                _sleep_duration = OFF_SLEEP_DURATION;
             }
 
             Barometer barometer(&_spi, (PinName)BAR_CS, (PinName)BAR_DRDY);
@@ -122,12 +82,6 @@ void FaceBitState::update_state()
             else if (mask_status == MaskStateDetection::ERROR)
             {
                 _logger->log(TRACE_WARNING, "%s", "MASK DETECTION ERROR");
-            }
-
-            if(_state_timer.read_ms() - ACTIVE_STATE_ENTRY_TS > ACTIVE_STATE_TIMEOUT)
-            {
-                _next_mask_state = OFF_FACE_INACTIVE;
-                _next_task_state = IDLE;
             }
 
             break;
@@ -169,7 +123,7 @@ void FaceBitState::update_state()
 
                     if(rate != -1)
                     {
-                        _logger->log(TRACE_INFO, "Respiration rate success");
+                        _logger->log(TRACE_INFO, "Respiratory rate success");
 
                         FaceBitData rr_data;
                         rr_data.data_type = RESPIRATORY_RATE;
@@ -238,7 +192,7 @@ void FaceBitState::update_state()
         }
 
             default:
-                _next_mask_state = OFF_FACE_INACTIVE; 
+                _next_mask_state = OFF_FACE; 
                 break;
     }
 
@@ -265,7 +219,7 @@ void FaceBitState::update_state()
             {
                 _logger->log(TRACE_INFO, "%s", "MASK OFF");
                 _next_task_state = IDLE;
-                _next_mask_state = OFF_FACE_ACTIVE;
+                _next_mask_state = OFF_FACE;
             }
             else if (mask_status == MaskStateDetection::ERROR)
             {

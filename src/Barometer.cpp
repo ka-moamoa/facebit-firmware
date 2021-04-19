@@ -35,7 +35,7 @@ bool Barometer::initialize()
         return false;
     }
 
-    if (_barometer.set_odr(BAROMETER_FREQUENCY) == LPS22HB_ERROR)
+    if (_barometer.set_odr(_frequency) == LPS22HB_ERROR)
     {
         return false;
     }
@@ -70,6 +70,7 @@ bool Barometer::set_frequency(uint8_t frequency)
         return false;
     }
 
+    _frequency = frequency;
     return true;
 }
 
@@ -83,14 +84,14 @@ bool Barometer::set_fifo_full_interrupt(bool enable)
     return true;
 }
 
-bool Barometer::update()
+bool Barometer::update(bool force)
 {
     // if the interrupt has been triggered, read the data
-    if (_bar_data_ready)
+    if (_bar_data_ready || force)
     {
         LPS22HB_FifoStatus_st fifo_status;
         _barometer.get_fifo_status(&fifo_status);
-        if (!fifo_status.FIFO_FULL)
+        if (!fifo_status.FIFO_FULL && !force)
         {
             _logger->log(TRACE_DEBUG, "%s", "FIFO not full, but interrupt triggered");
             return false;
@@ -171,14 +172,17 @@ bool Barometer::read_buffered_data()
 
     if (_pressure_buffer.size() > _max_buffer_size)
     {
-        uint8_t elements_to_delete = _pressure_buffer.size() - _max_buffer_size;
-        _pressure_buffer.erase(_pressure_buffer.begin(), _pressure_buffer.begin()+elements_to_delete);
+        _pressure_buffer.resize(_max_buffer_size);
     }
 
     if (_temperature_buffer.size() > _max_buffer_size)
     {
-        uint8_t elements_to_delete = _temperature_buffer.size() - _max_buffer_size;
-        _temperature_buffer.erase(_temperature_buffer.begin(), _temperature_buffer.begin()+elements_to_delete);
+        _temperature_buffer.resize(_max_buffer_size);
+    }
+
+    for (int i = 0; i < _pressure_buffer.size(); i++)
+    {
+        _logger->log(TRACE_INFO, "size = %i, [%i] = %i", _pressure_buffer.size(), i,  _pressure_buffer[i]);
     }
 
     _bar_data_ready = false;

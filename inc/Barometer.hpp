@@ -11,12 +11,12 @@ public:
     Barometer(SPI *spi, PinName cs_pin, PinName int_pin);
     ~Barometer();
 
-    const float BAROMETER_FREQUENCY = 24.0; // Hz
     const uint16_t MAX_ALLOWABLE_SIZE = 200; //This is a little arbitrary, just want to have a cap on the buffer size.
 
     bool initialize();
     bool set_frequency(uint8_t frequency);
-    bool update();
+    uint8_t get_frequency() { return _frequency; }
+    bool update(bool force = false);
 
     bool set_fifo_full_interrupt(bool enable);
     bool enable_pressure_threshold(bool enable, bool high_pressure, bool low_pressure);
@@ -41,7 +41,6 @@ public:
 private:
     bool _initialized = false;
     bool _bar_data_ready = false;
-    LPS22HB_Data_st _lps22hbData[FIFO_LENGTH] = {{0}, {0}};
     std::vector<uint16_t> _pressure_buffer;
     std::vector<uint16_t> _temperature_buffer;
     bool _high_pressure_event_flag = false;
@@ -50,6 +49,7 @@ private:
     uint64_t _last_timestamp = 0;
     uint64_t _last_broadcast_timestamp = 0;
     uint32_t _measurement_frequencyx100;
+    uint8_t _frequency = 24.0; // default value, can change
 
     BusControl *_bus_control;
     LPS22HBSensor _barometer;
