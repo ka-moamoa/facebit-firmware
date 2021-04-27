@@ -44,6 +44,8 @@ Si7051::Si7051(I2C *i2c, char address)
 void Si7051::initialize() {
 	setResolution(12);
 
+	ThisThread::sleep_for(1ms);
+
 	_frequency_timer.reset();
 	_frequency_timer.start();
 

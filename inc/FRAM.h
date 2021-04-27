@@ -4,11 +4,21 @@
 #include "mbed.h"
 #include "SPI.h"
 #include "Logger.h"
+#include "BusControl.h"
+
 class FRAM
 {
+public:
+    FRAM(SPI *spi, PinName fram_cs);
+    ~FRAM();
+
+    bool write_bytes(uint32_t address, const char *tx_buffer, int tx_bytes);
+    uint8_t read_bytes(uint32_t address, char *rx_buffer, int rx_bytes);
 private:
     SPI *_spi;
     DigitalOut _fram_cs;
+    BusControl* _bus_control;
+    Logger* _logger;
 
     bool _write_opcode(uint8_t opcode);
 
@@ -30,16 +40,6 @@ private:
     const uint8_t OP_SNR     = 0b11000011; // Read S/N
 
     const uint32_t MAX_ADDRESS = 0x0001FFFF;
-public:
-    FRAM(SPI *spi, PinName fram_cs);
-    ~FRAM();
-
-    Logger* _logger;
-
-    void initialize();
-
-    bool write_bytes(uint32_t address, const char *tx_buffer, int tx_bytes);
-    uint8_t read_bytes(uint32_t address, char *rx_buffer, int rx_bytes);
 };
 
 

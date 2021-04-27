@@ -18,7 +18,7 @@ bool Barometer::initialize()
 {
     if (_initialized)
     {
-        _logger->log(TRACE_INFO, "%s", "Barometer has already been initialized");
+        _logger->log(TRACE_WARNING, "%s", "Barometer has already been initialized");
         return false;
     }
 
@@ -178,11 +178,6 @@ bool Barometer::read_buffered_data()
     if (_temperature_buffer.size() > _max_buffer_size)
     {
         _temperature_buffer.resize(_max_buffer_size);
-    }
-
-    for (int i = 0; i < _pressure_buffer.size(); i++)
-    {
-        _logger->log(TRACE_INFO, "size = %i, [%i] = %i", _pressure_buffer.size(), i,  _pressure_buffer[i]);
     }
 
     _bar_data_ready = false;

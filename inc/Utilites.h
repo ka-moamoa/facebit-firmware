@@ -14,7 +14,7 @@ namespace Utilities
         return output_start + slope * (val - input_start);
     }
 
-    inline double round(double val)
+    inline int round(double val)
     {
         return floor(val + 0.5);
     }

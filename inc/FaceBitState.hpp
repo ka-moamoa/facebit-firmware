@@ -49,7 +49,7 @@ private:
     I2C _i2c;
     BusControl* _bus_control;
     Logger* _logger;
-    FRAM _fram;
+    // FRAM _fram;
     LowPowerTimer _state_timer;
 
 
@@ -64,8 +64,8 @@ private:
 
     struct FaceBitData
     {
-        FACEBIT_DATA_TYPES_t data_type;
         uint64_t timestamp;
+        FACEBIT_DATA_TYPES_t data_type;
         uint8_t value;
     };
 
@@ -81,11 +81,11 @@ private:
 
     milliseconds _sleep_duration = 1000ms;
 
-    milliseconds OFF_SLEEP_DURATION = 30000ms;
-    milliseconds ON_FACE_SLEEP_DURATION = 1000ms;
+    milliseconds OFF_SLEEP_DURATION = 5000ms;
+    milliseconds ON_FACE_SLEEP_DURATION = 5000ms;
 
-    const uint32_t RR_PERIOD = 1 * 60 * 1000; // 1 min
-    const uint32_t HR_PERIOD = 1 * 60 * 1000; // 1 min
+    const uint32_t RR_PERIOD = 0 * 10 * 1000; // 1 min
+    const uint32_t HR_PERIOD = 0 * 40 * 1000; // 1 min
     const uint32_t BLE_BROADCAST_PERIOD = 2 * 60 * 1000; // 2 min
 
     const uint32_t BLE_CONNECTION_TIMEOUT = 5000;
@@ -98,13 +98,23 @@ private:
     uint32_t _last_mf_ts = 0;
     uint32_t _last_ble_ts = 0;
 
-    const uint8_t RESP_RATE_FAILURE = 255;
-    const uint8_t HR_FAILURE = 255;
+    const uint8_t RESP_RATE_FAILURE = 1;
+    const uint8_t HR_FAILURE = 1;
 
     bool _ble_initialized = false;
 
+    const uint8_t BUFFER_SIZE_ADDR = 10;
+    const uint8_t CURRENT_TIME_ADDR = 12;
+    const uint8_t DATA_BUFFER_ADDR = 20;
+    const uint8_t INITIALIZE_ADDR = 1;
+    const char INITIALIZE_STR[4] = {0xAB, 0xAF, 0xFA, 0xAA};
+
     bool _get_imu_int();
     bool _sync_data();
+    // bool _store_data_buffer();
+    // uint64_t _retrieve_time();
+    // bool _store_time();
+    // bool _initialize_fram();
 };
 
 

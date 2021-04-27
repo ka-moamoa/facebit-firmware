@@ -170,8 +170,7 @@ bool BCG::bcg(const seconds num_seconds)
                     Utilities::reciprocal(crosses_copy); // get element-wise frequency
                     Utilities::multiply(crosses_copy, 60.0); // get element-wise heart rate
                     float std_dev = Utilities::std_dev(crosses_copy); // calculate standard deviation across the heart rates
-                    // printf("%0.3f", std_dev);
-
+                    
                     if (std_dev < STD_DEV_THRESHOLD) // we have some stable readings! calculate heart rate
                     {
                         float rate_raw = Utilities::mean(crosses_copy);
@@ -180,7 +179,7 @@ bool BCG::bcg(const seconds num_seconds)
                         if (rate_raw >= MIN_HR && rate_raw <= MAX_HR)
                         {
                             rates.push_back(rate_raw);
-                            _logger->log(TRACE_INFO, "New HR reading --> rate: %0.1f, time: %lli", rate_raw, time(NULL));
+                            _logger->log(TRACE_DEBUG, "New HR reading --> rate: %0.1f, time: %lli", rate_raw, time(NULL));
                         }
                     }
 
@@ -208,7 +207,7 @@ bool BCG::bcg(const seconds num_seconds)
     {
         float average_rate = Utilities::mean(rates);
         float std_dev_rate = Utilities::std_dev(rates);
-        _logger->log(TRACE_INFO, "average HR before outlier detection = %0.1f, std_dev = %0.1f", average_rate, std_dev_rate);
+        _logger->log(TRACE_DEBUG, "average HR before outlier detection = %0.1f, std_dev = %0.1f", average_rate, std_dev_rate);
         
         for (int i = 0; i < rates.size(); i++)
         {
@@ -224,7 +223,6 @@ bool BCG::bcg(const seconds num_seconds)
         HR_t new_hr;
         new_hr.rate = Utilities::round(average_rate);
         new_hr.timestamp = time(NULL);
-
 
         while (_HR.size() >= HR_BUFFER_SIZE)
         {

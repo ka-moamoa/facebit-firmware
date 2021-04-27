@@ -50,7 +50,6 @@ float RespiratoryRate::respiratory_rate(const uint8_t num_seconds, RespSource_t 
 		ThisThread::sleep_for(10ms);
 
 		_temp.initialize();
-		_temp.setResolution(12); // bits
 		_temp.setFrequency(FREQUENCY); // hz
 	}
 
@@ -75,6 +74,7 @@ float RespiratoryRate::respiratory_rate(const uint8_t num_seconds, RespSource_t 
     double last_sample = -1.0;
     uint16_t sample_index = 0;
     vector<uint16_t> zc_indices;
+	bool zc_initialized;
 	bool initialized = false;
 
 	#ifdef RESP_RATE_LOGGING
@@ -143,7 +143,15 @@ float RespiratoryRate::respiratory_rate(const uint8_t num_seconds, RespSource_t 
 				bool a_zc = false;
                 if (last_sample > 0 && filtered_sample < 0)
                 {
-                    zc_indices.push_back(sample_index);
+					if (zc_initialized)
+					{
+                    	zc_indices.push_back(sample_index);
+						_logger->log(TRACE_DEBUG, "breath detected");
+					}
+					else
+					{
+						zc_initialized = true;
+					}
 					d_zc = true;
                 }
 				else if (last_sample < 0 && filtered_sample > 0)
@@ -186,6 +194,7 @@ float RespiratoryRate::respiratory_rate(const uint8_t num_seconds, RespSource_t 
 	Utilities::multiply(zc_ts, 1.0 / (float)FREQUENCY); // convert indices to timestamps
 
 	std::adjacent_difference(zc_ts.begin(), zc_ts.end(), zc_ts.begin());
+	zc_ts.erase(zc_ts.begin());
 
 	Utilities::reciprocal(zc_ts); // get element-wise frequency
 	Utilities::multiply(zc_ts, 60.0); // get element-wise respiratory rate
@@ -194,22 +203,27 @@ float RespiratoryRate::respiratory_rate(const uint8_t num_seconds, RespSource_t 
 
 	for (int i = 0; i < zc_ts.size(); i++)
 	{
+		_logger->log(TRACE_TRACE, "rr[%i] = %0.1f", zc_ts[i]);
 		if (zc_ts[i] < 4 || zc_ts[i] > 30) // these resp rates are out-of bounds for our filtering (and physiologically unlikely)
 		{
-			_logger->log(TRACE_INFO, "Deleting resp rate element %i: %0.1f breaths/min", zc_ts[i]);
+			_logger->log(TRACE_DEBUG, "Deleting resp rate element %i: %0.1f breaths/min", zc_ts[i]);
 			zc_ts.erase(zc_ts.begin() + i); 
 		}
 	}
 
 	double resp_rate = 0;
-	if (zc_ts.size() < (4 * 60 / num_seconds))
+	if (zc_ts.size() < (4 * num_seconds / 60))
 	{
 		resp_rate = -1;
 		_logger->log(TRACE_WARNING, "Not enough zero-crosses to detect resp rate: %i crosses", zc_ts.size());
 	}
 	else
 	{
-		double resp_rate = Utilities::mean(zc_ts);
+		resp_rate = Utilities::mean(zc_ts);
+		if (resp_rate < 4 || resp_rate > 30) // filter not designed to detect RR greater than this.
+		{
+			resp_rate = -1; 
+		}
 		_logger->log(TRACE_INFO, "Respiration rate = %0.1f, std dev = %0.1f", resp_rate, std_dev);
 	}
 

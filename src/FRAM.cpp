@@ -10,19 +10,16 @@ _fram_cs(fram_cs)
     _logger = Logger::get_instance();
     _spi = spi;
     _fram_cs = 1;
+    _bus_control = BusControl::get_instance();
 }
 
 FRAM::~FRAM()
 {
 }
 
-void FRAM::initialize()
-{
-}
-
-
 bool FRAM::write_bytes(uint32_t address, const char *tx_buffer, int tx_bytes)
 {
+
     if (address > MAX_ADDRESS)
     {
         _logger->log(TRACE_WARNING, "%s", "SPI address is too large!");
@@ -34,6 +31,9 @@ bool FRAM::write_bytes(uint32_t address, const char *tx_buffer, int tx_bytes)
 
     const char write_address[3] = {unpack.bytes[2], unpack.bytes[1], unpack.bytes[0]}; // flip endianness
     
+    _bus_control->spi_power(true);
+    ThisThread::sleep_for(10ms); // let spi bus turn on
+
     _fram_cs = 0; // CS assert
     _write_opcode(OP_WREN);
     _fram_cs = 1; //CS deassert (CS has to toggle after the WREN opcode)
@@ -44,7 +44,10 @@ bool FRAM::write_bytes(uint32_t address, const char *tx_buffer, int tx_bytes)
     _spi->write(tx_buffer, tx_bytes, NULL, 0); // This is the actual data transmission
     _fram_cs = 1; // CS deassert
 
-    return true; // TODO add error checking
+    ThisThread::sleep_for(1ms);
+    _bus_control->spi_power(false);
+
+    return true;
 }
 
 uint8_t FRAM::read_bytes(uint32_t address, char *rx_buffer, int rx_bytes)
@@ -60,6 +63,9 @@ uint8_t FRAM::read_bytes(uint32_t address, char *rx_buffer, int rx_bytes)
 
     const char read_address[3] = {unpack.bytes[2], unpack.bytes[1], unpack.bytes[0]}; // flip endianness
 
+    _bus_control->spi_power(true);
+    ThisThread::sleep_for(10ms); // let spi bus turn on
+
     _fram_cs = 0; // CS assert
     
     _spi->write(OP_READ); // send read opcode
@@ -67,6 +73,9 @@ uint8_t FRAM::read_bytes(uint32_t address, char *rx_buffer, int rx_bytes)
     _spi->write(NULL, 0, rx_buffer, rx_bytes); // read out data
 
     _fram_cs = 1; // CS deassert
+
+    ThisThread::sleep_for(1ms);
+    _bus_control->spi_power(false);
 
      return true; // TODO add SPI error checking
 }
