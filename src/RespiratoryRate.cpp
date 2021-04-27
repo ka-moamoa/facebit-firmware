@@ -220,11 +220,12 @@ float RespiratoryRate::respiratory_rate(const uint8_t num_seconds, RespSource_t 
 	else
 	{
 		resp_rate = Utilities::mean(zc_ts);
-		if (resp_rate < 4 || resp_rate > 30) // filter not designed to detect RR greater than this.
-		{
-			resp_rate = -1; 
-		}
 		_logger->log(TRACE_INFO, "Respiration rate = %0.1f, std dev = %0.1f", resp_rate, std_dev);
+	}
+	
+	if (resp_rate < 4 || resp_rate > 30) // filter not designed to detect RR outside these limits
+	{
+		resp_rate = -1; 
 	}
 
 	return resp_rate;
