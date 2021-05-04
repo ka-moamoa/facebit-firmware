@@ -227,6 +227,6 @@ float RespiratoryRate::respiratory_rate(const uint8_t num_seconds, RespSource_t 
 	{
 		resp_rate = -1; 
 	}
-
+	
 	return resp_rate;
 }

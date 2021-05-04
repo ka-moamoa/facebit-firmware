@@ -42,7 +42,7 @@ private:
     vector<RR_t> respiratory_rate_buffer;
 
     const int8_t ERROR = -1;
-    const uint8_t BUFFER = 1; // second
+    const uint8_t BUFFER = 0; // second
     const uint8_t FREQUENCY = 10; // hz
 };
 
