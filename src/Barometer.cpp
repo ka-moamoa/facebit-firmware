@@ -5,8 +5,7 @@ using namespace std::chrono;
 
 Barometer::Barometer(SPI *spi, PinName cs_pin, PinName int_pin) :
 _barometer(spi, cs_pin),
-_int_pin(int_pin),
-_t_barometer()
+_int_pin(int_pin, PullNone)
 {
     _logger = Logger::get_instance();
 }
@@ -19,7 +18,7 @@ bool Barometer::initialize()
 {
     if (_initialized)
     {
-        _logger->log(TRACE_INFO, "%s", "Barometer has already been initialized");
+        _logger->log(TRACE_WARNING, "%s", "Barometer has already been initialized");
         return false;
     }
 
@@ -36,7 +35,7 @@ bool Barometer::initialize()
         return false;
     }
 
-    if (_barometer.set_odr(BAROMETER_FREQUENCY) == LPS22HB_ERROR)
+    if (_barometer.set_odr(_frequency) == LPS22HB_ERROR)
     {
         return false;
     }
@@ -64,6 +63,17 @@ bool Barometer::initialize()
     return true;
 }
 
+bool Barometer::set_frequency(uint8_t frequency)
+{
+    if (_barometer.set_odr((float)frequency - 0.1) == LPS22HB_ERROR) // - 0.1 because they try to compare floats in the driver 
+    {
+        return false;
+    }
+
+    _frequency = frequency;
+    return true;
+}
+
 bool Barometer::set_fifo_full_interrupt(bool enable)
 {
     if (_barometer.fifo_full_interrupt(enable) == LPS22HB_ERROR)
@@ -74,14 +84,14 @@ bool Barometer::set_fifo_full_interrupt(bool enable)
     return true;
 }
 
-bool Barometer::update()
+bool Barometer::update(bool force)
 {
     // if the interrupt has been triggered, read the data
-    if (_bar_data_ready)
+    if (_bar_data_ready || force)
     {
         LPS22HB_FifoStatus_st fifo_status;
         _barometer.get_fifo_status(&fifo_status);
-        if (!fifo_status.FIFO_FULL)
+        if (!fifo_status.FIFO_FULL && !force)
         {
             _logger->log(TRACE_DEBUG, "%s", "FIFO not full, but interrupt triggered");
             return false;
@@ -147,6 +157,11 @@ uint64_t Barometer::get_delta_timestamp(bool broadcast)
     return delta_t;
 }
 
+float Barometer::convert_to_hpa(uint16_t raw_data)
+{
+  return ((float)raw_data + 80000.0) / 100.0;
+}
+
 bool Barometer::read_buffered_data()
 {
     if (_barometer.get_fifo(_pressure_buffer, _temperature_buffer) == LPS22HB_ERROR)
@@ -157,14 +172,12 @@ bool Barometer::read_buffered_data()
 
     if (_pressure_buffer.size() > _max_buffer_size)
     {
-        uint8_t elements_to_delete = _pressure_buffer.size() - _max_buffer_size;
-        _pressure_buffer.erase(_pressure_buffer.begin(), _pressure_buffer.begin()+elements_to_delete);
+        _pressure_buffer.resize(_max_buffer_size);
     }
 
     if (_temperature_buffer.size() > _max_buffer_size)
     {
-        uint8_t elements_to_delete = _temperature_buffer.size() - _max_buffer_size;
-        _temperature_buffer.erase(_temperature_buffer.begin(), _temperature_buffer.begin()+elements_to_delete);
+        _temperature_buffer.resize(_max_buffer_size);
     }
 
     _bar_data_ready = false;
@@ -173,6 +186,8 @@ bool Barometer::read_buffered_data()
 
 void Barometer::set_max_buffer_size(uint16_t size)
 {
+    if (size > MAX_ALLOWABLE_SIZE) size = MAX_ALLOWABLE_SIZE;
+
     _max_buffer_size = size;
 }
 

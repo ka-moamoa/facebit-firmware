@@ -11,6 +11,7 @@
 #include "ble_process.h"
 #include "LowPowerTimer.h"
 #include "TARGET_SMARTPPE/PinNames.h"
+#include "Utilites.h"
 
 events::EventQueue FaceBitState::ble_queue(16 * EVENTS_EVENT_SIZE);
 Thread FaceBitState::_ble_thread(osPriorityNormal, 4096);
@@ -33,30 +34,19 @@ FaceBitState::~FaceBitState()
 void FaceBitState::run()
 {
     _spi.frequency(8000000); // fast, to reduce transaction time
-    LowPowerTimer state_timer;
 
-    state_timer.start();
-
-    BLE &_ble = BLE::Instance();
-    GattServerProcess _ble_process(ble_queue, _ble);
-    _ble_process.on_init(callback(_smart_ppe_ble, &SmartPPEService::start));
-    
-    _ble_thread.start(callback(&_ble_process, &GattServerProcess::run));
-    
+    _state_timer.start();
     _force_update = true;
-    _sync_data(&_ble_process);
 
     while(1)
     {
-        uint32_t ts = state_timer.read_ms();
-
-        update_state(ts);
+        update_state();
         _bus_control->set_led_blinks((uint8_t)_mask_state + 1);
         
-        if (ts - _last_ble_ts > BLE_BROADCAST_PERIOD)
+        if (_state_timer.read_ms() > BLE_BROADCAST_PERIOD)
         {
-            _sync_data(&_ble_process);
-            _last_ble_ts = ts;
+            _sync_data();
+            _last_ble_ts = _state_timer.read_ms();
         }
 
         _logger->log(TRACE_TRACE, "sleeping for %lli", static_cast<long long int>(_sleep_duration.count()));
@@ -64,55 +54,15 @@ void FaceBitState::run()
     }
 }
 
-void FaceBitState::update_state(uint32_t ts)
+void FaceBitState::update_state()
 {
     switch(_mask_state)
     {
-        case OFF_FACE_INACTIVE:
+        case OFF_FACE:
         {
             if (_new_mask_state)
             {
-                _bus_control->spi_power(true);
-                ThisThread::sleep_for(10ms);
-            
-                LSM6DSLSensor imu(&_spi, (PinName)IMU_CS);
-                imu.init(NULL);
-
-                imu.enable_x();
-                imu.enable_wake_up_detection(_wakeup_int_pin);
-                imu.set_wake_up_threshold(LSM6DSL_WAKE_UP_THRESHOLD_LOW);
-
-                _bus_control->set_power_lock(BusControl::IMU, true);
-                _bus_control->spi_power(false);
-                
-                _sleep_duration = INACTIVE_SLEEP_DURATION;
-            }
-
-            if (_get_imu_int())
-            {
-                _logger->log(TRACE_INFO, "%s", "MOTION DETECTED");
-                _next_mask_state = OFF_FACE_ACTIVE;
-
-                _bus_control->spi_power(true);
-                ThisThread::sleep_for(10ms);
-
-                LSM6DSLSensor imu(&_spi, (PinName)IMU_CS);
-                imu.init(NULL);
-
-                imu.disable_x();
-                imu.disable_tilt_detection();
-
-                _bus_control->set_power_lock(BusControl::IMU, false);
-                _bus_control->spi_power(false);
-            }
-            break;
-        }
-        case OFF_FACE_ACTIVE:
-        {
-            if (_new_mask_state)
-            {
-                ACTIVE_STATE_ENTRY_TS = ts;
-                _sleep_duration = ACTIVE_SLEEP_DURATION;
+                _sleep_duration = OFF_SLEEP_DURATION;
             }
 
             Barometer barometer(&_spi, (PinName)BAR_CS, (PinName)BAR_DRDY);
@@ -135,12 +85,6 @@ void FaceBitState::update_state(uint32_t ts)
                 _logger->log(TRACE_WARNING, "%s", "MASK DETECTION ERROR");
             }
 
-            if(ts - ACTIVE_STATE_ENTRY_TS > ACTIVE_STATE_TIMEOUT)
-            {
-                _next_mask_state = OFF_FACE_INACTIVE;
-                _next_task_state = IDLE;
-            }
-
             break;
         }
         case ON_FACE:
@@ -151,14 +95,14 @@ void FaceBitState::update_state(uint32_t ts)
             {
                 case IDLE:
                 {
-                    uint32_t rr_time_over = ts - _last_rr_ts;
-                    uint32_t hr_time_over = ts - _last_hr_ts;
+                    uint32_t rr_time_over = _state_timer.read_ms() - _last_rr_ts;
+                    uint32_t hr_time_over = _state_timer.read_ms() - _last_hr_ts;
 
-                    if (ts - _last_rr_ts >= RR_PERIOD && (rr_time_over >= hr_time_over))
+                    if (_state_timer.read_ms() - _last_rr_ts >= RR_PERIOD && (rr_time_over >= hr_time_over))
                     {
                         _next_task_state = MEASURE_RESPIRATION_RATE;
                     }
-                    else if (ts - _last_hr_ts >= HR_PERIOD && (hr_time_over >= rr_time_over))
+                    else if (_state_timer.read_ms() - _last_hr_ts >= HR_PERIOD && (hr_time_over >= rr_time_over))
                     {
                         _next_task_state = MEASURE_HEART_RATE;
                     }
@@ -168,35 +112,39 @@ void FaceBitState::update_state(uint32_t ts)
 
                 case MEASURE_RESPIRATION_RATE:
                 {
-                    CapCalc* cap = CapCalc::get_instance();
                     Si7051 temp(&_i2c);
-                    RespiratoryRate resp_rate(cap, temp);
+                    Barometer barometer(&_spi, BAR_CS, BAR_DRDY);
+                    RespiratoryRate resp_rate(temp, barometer);
 
                     _logger->log(TRACE_INFO, "RESP RATE MEASUREMENT");
 
-                    _last_rr_ts = ts;
+                    _last_rr_ts = _state_timer.read_ms();
 
-                    if(resp_rate.get_resp_rate())
+                    float rate = resp_rate.respiratory_rate(30, RespiratoryRate::THERMOMETER);
+
+                    if(rate > 0)
                     {
-                        if (resp_rate.get_buffer_size())
-                        {
-                            _logger->log(TRACE_INFO, "Respiration rate success");
+                        FaceBitData rr_data;
+                        rr_data.data_type = RESPIRATORY_RATE;
+                        rr_data.timestamp = Utilities::round(_state_timer.read());
+                        rr_data.value = Utilities::round(rate * 10);
 
-                            RespiratoryRate::RR_t rr = resp_rate.get_buffer_element();
+                        _logger->log(TRACE_INFO, "RR ts: %llu, value: %u", rr_data.timestamp, rate);
 
-                            FaceBitData rr_data;
-                            rr_data.data_type = RESPIRATORY_RATE;
-                            rr_data.timestamp = rr.timestamp;
-                            rr_data.value = rr.rate;
-
-                            data_buffer.push_back(rr_data);
-                        }
-
+                        data_buffer.push_back(rr_data);
                     }
                     else
                     {
-                        _logger->log(TRACE_INFO, "Respiration rate failure");
+                        _logger->log(TRACE_INFO, "Respiratory rate failure");
+                        FaceBitData rr_failure;
+                        rr_failure.data_type = RESPIRATORY_RATE;
+                        rr_failure.timestamp = Utilities::round(_state_timer.read());
+                        rr_failure.value = RESP_RATE_FAILURE;
+
+                        data_buffer.push_back(rr_failure);
                     }
+
+                    // _store_data_buffer();
 
                     _next_task_state = IDLE;
 
@@ -206,28 +154,42 @@ void FaceBitState::update_state(uint32_t ts)
                 case MEASURE_HEART_RATE:
                 {
                     _logger->log(TRACE_INFO, "%s", "MEASURING HR");
-                    _last_hr_ts = ts;
+                    _last_hr_ts = _state_timer.read_ms();
                     BCG bcg(&_spi, (PinName)IMU_INT1, (PinName)IMU_CS);
 
-                    if(bcg.bcg(15s)) // blocking
+                    if(bcg.bcg(10s)) // blocking
                     {
-                        _logger->log(TRACE_INFO, "%s", "HR CAPTURED!");
+                        _logger->log(TRACE_DEBUG, "%s", "HR CAPTURED!");
                         for(int i = 0; i < bcg.get_buffer_size(); i++)
                         {
                             FaceBitData hr_data;
                             BCG::HR_t hr = bcg.get_buffer_element();
 
                             hr_data.data_type = HEART_RATE;
-                            hr_data.timestamp = hr.timestamp;
+                            hr_data.timestamp = Utilities::round(_state_timer.read());
                             hr_data.value = hr.rate;
 
                             data_buffer.push_back(hr_data);
                         }
                     }
+                    else
+                    {
+                        _logger->log(TRACE_INFO, "%s", "HR FAILURE!");
+                        FaceBitData hr_data;
+
+                        hr_data.data_type = HEART_RATE;
+                        hr_data.timestamp = _state_timer.read();
+                        hr_data.value = HR_FAILURE;
+
+                        data_buffer.push_back(hr_data);                       
+                    }
+
+                    // _store_data_buffer();
+
                     _next_task_state = IDLE;
+
                     break;
                 }
-
                 default:
                     _next_task_state = IDLE;
                     break;
@@ -237,7 +199,7 @@ void FaceBitState::update_state(uint32_t ts)
         }
 
             default:
-                _next_mask_state = OFF_FACE_INACTIVE; 
+                _next_mask_state = OFF_FACE; 
                 break;
     }
 
@@ -264,7 +226,7 @@ void FaceBitState::update_state(uint32_t ts)
             {
                 _logger->log(TRACE_INFO, "%s", "MASK OFF");
                 _next_task_state = IDLE;
-                _next_mask_state = OFF_FACE_ACTIVE;
+                _next_mask_state = OFF_FACE;
             }
             else if (mask_status == MaskStateDetection::ERROR)
             {
@@ -275,7 +237,7 @@ void FaceBitState::update_state(uint32_t ts)
 
         _new_task_state = true;
         _task_state = _next_task_state;
-        _logger->log(TRACE_INFO, "TASK STATE: %i", _task_state);
+        _logger->log(TRACE_TRACE, "TASK STATE: %i", _task_state);
 
         _sleep_duration = 1ms;
     }
@@ -288,7 +250,7 @@ void FaceBitState::update_state(uint32_t ts)
 
         _new_mask_state = true;
         _mask_state = _next_mask_state;
-        _logger->log(TRACE_INFO, "MASK STATE: %i", _mask_state);
+        _logger->log(TRACE_TRACE, "MASK STATE: %i", _mask_state);
 
         _sleep_duration = 10ms;
     }
@@ -305,8 +267,14 @@ bool FaceBitState::_get_imu_int()
     return tmp;
 }
 
-bool FaceBitState::_sync_data(GattServerProcess *_ble_process)
-{    
+bool FaceBitState::_sync_data()
+{
+    BLE &_ble = BLE::Instance();
+    GattServerProcess _ble_process(ble_queue, _ble);
+    _ble_process.on_init(callback(_smart_ppe_ble, &SmartPPEService::start));
+
+    _ble_thread.start(callback(&_ble_process, &GattServerProcess::run));
+
     if (data_buffer.size() == 0 && _force_update == false)
     {
         _logger->log(TRACE_DEBUG, "%s", "NO DATA TO SEND");
@@ -321,17 +289,17 @@ bool FaceBitState::_sync_data(GattServerProcess *_ble_process)
     // wait for connection
     LowPowerTimer ble_timeout;
     ble_timeout.start();
-    while(!_ble_process->is_connected())
+    while(!_ble_process.is_connected())
     {
         Thread::State state = _ble_thread.get_state();
-        uint16_t size = _ble_process->event_queue_size;
+        uint16_t size = _ble_process.event_queue_size;
         // _logger->log(TRACE_TRACE, "Thread state = %u, equeue size = %u", state, size);
         
         if (ble_timeout.read_ms() > BLE_CONNECTION_TIMEOUT)
         {
             _logger->log(TRACE_INFO, "%s", "TIMEOUT BEFORE BLE CONNECTION");
             _ble_thread.flags_set(STOP_BLE);
-            return false;
+            system_reset();
         }
 
         ThisThread::sleep_for(10ms);
@@ -357,10 +325,10 @@ bool FaceBitState::_sync_data(GattServerProcess *_ble_process)
         {
             _logger->log(TRACE_INFO, "%s", "BLE DATA READY TIMEOUT (MASK ON)");
             _ble_thread.flags_set(STOP_BLE);
-            return false;
+            system_reset();
         }
 
-        ThisThread::sleep_for(100ms);
+        ThisThread::sleep_for(500ms);
     }
 
     // sync timestamp
@@ -385,8 +353,10 @@ bool FaceBitState::_sync_data(GattServerProcess *_ble_process)
         switch(next_data_point.data_type)
         {
             case HEART_RATE:
-                _logger->log(TRACE_DEBUG, "WRITING HR = %u", next_data_point.value);
-                _smart_ppe_ble->updateHeartRate(next_data_point.timestamp, next_data_point.value);
+            {
+                _logger->log(TRACE_DEBUG, "WRITING HR = %u, TS: %u", next_data_point.value, (_state_timer.read() - next_data_point.timestamp));
+                uint64_t data_ts = Utilities::round(_state_timer.read()) - next_data_point.timestamp;
+                _smart_ppe_ble->updateHeartRate(data_ts, next_data_point.value);
                 _smart_ppe_ble->updateDataReady(_smart_ppe_ble->HEART_RATE);
                 
                 ble_timeout.reset();
@@ -400,13 +370,15 @@ bool FaceBitState::_sync_data(GattServerProcess *_ble_process)
                         _ble_thread.flags_set(STOP_BLE);
                         return false;
                     }
-                    ThisThread::sleep_for(100ms);
+                    ThisThread::sleep_for(1000ms);
                 }
                 break;
-            
+            }
             case RESPIRATORY_RATE:
-                _logger->log(TRACE_DEBUG, "WRITING RESP RATE = %u", next_data_point.value);
-                _smart_ppe_ble->updateRespiratoryRate(next_data_point.timestamp, next_data_point.value);
+            {
+                _logger->log(TRACE_DEBUG, "WRITING RESP RATE = %u, TS: %u", next_data_point.value, (_state_timer.read() - next_data_point.timestamp));
+                uint64_t data_ts = Utilities::round(_state_timer.read()) - next_data_point.timestamp;
+                _smart_ppe_ble->updateRespiratoryRate(data_ts, next_data_point.value);
                 _smart_ppe_ble->updateDataReady(_smart_ppe_ble->RESPIRATORY_RATE);
                 ble_timeout.reset();
                 ble_timeout.start();
@@ -419,10 +391,10 @@ bool FaceBitState::_sync_data(GattServerProcess *_ble_process)
                         _ble_thread.flags_set(STOP_BLE);
                         return false;
                     }
-                    ThisThread::sleep_for(100ms);
+                    ThisThread::sleep_for(1000ms);
                 }
                 break;
-
+            }
             case MASK_FIT:
                 // _smart_ppe_ble.updateRespiratoryRate(next_data_point.timestamp, next_data_point.value);
                 break;
@@ -438,5 +410,71 @@ bool FaceBitState::_sync_data(GattServerProcess *_ble_process)
 
     _ble_thread.flags_set(STOP_BLE);
 
+    // _store_time();
+
+    system_reset();
+
     return true;
 }
+
+// bool FaceBitState::_store_data_buffer()
+// {
+//     bool success = true;
+
+//     // write size of buffer
+//     char size = data_buffer.size();
+//     success &= _fram.write_bytes(BUFFER_SIZE_ADDR, &size, 1);
+
+//     // write buffer
+//     char* buffer = (char*)data_buffer.data();
+//     success &= _fram.write_bytes(DATA_BUFFER_ADDR, buffer, size * sizeof(FaceBitData));
+
+//     return success;
+// }
+
+// uint64_t FaceBitState::_retrieve_time()
+// {
+//     uint64_t time = 0;
+    
+//     char time_array[8] = {0};
+//     _fram.read_bytes(CURRENT_TIME_ADDR, time_array, 8);
+
+//     std::memcpy(&time, time_array, 8);
+
+//     return time;
+// }
+
+// bool FaceBitState::_store_time()
+// {
+//     uint64_t time_val = time(NULL);
+    
+//     char time_array[8] = {0};
+//     std::memcpy(time_array, &time_val, 8);
+//     bool success = _fram.write_bytes(CURRENT_TIME_ADDR, time_array, 8);
+
+//     return success;
+// }
+
+// bool FaceBitState::_initialize_fram()
+// {
+//     char rx_buffer[4] = {0};
+//     _fram.read_bytes(INITIALIZE_ADDR, &rx_buffer[0], 4);
+
+//     int initialized = std::memcmp(&rx_buffer[0], &INITIALIZE_STR[0], 4);
+
+//     _logger->log(TRACE_INFO, "RX buffer = 0x%X, 0x%X, 0x%X, 0x%X", rx_buffer[0], rx_buffer[1], rx_buffer[2], rx_buffer[3]);
+
+//     if (initialized != 0)
+//     {
+//         _logger->log(TRACE_INFO, "FRAM not initialized, initializing...");
+
+//         char initialize[8] = {0};
+//         _fram.write_bytes(BUFFER_SIZE_ADDR, &initialize[0], 2);
+//         _fram.write_bytes(CURRENT_TIME_ADDR, &initialize[0], 8);
+//         _fram.write_bytes(INITIALIZE_ADDR, INITIALIZE_STR, 4);
+
+//         return false;
+//     }
+
+//     return true;
+// }

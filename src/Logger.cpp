@@ -32,6 +32,7 @@ void Logger::initialize(UnbufferedSerial* serial, trace_level_t trace_level)
     _serial = serial;
     _serial->baud(115200);
     _serial->enable_input(false);
+    _serial->enable_output(false);
 
     _trace_level = trace_level;
 
@@ -59,8 +60,8 @@ void Logger::log(trace_level_t level, const char *msg, ...)
     va_list args;
     va_start (args, msg);
 
-    char buffer[50];
-    vsnprintf(buffer, 50, msg, args);
+    char buffer[200];
+    vsnprintf(buffer, 200, msg, args);
     va_end(args);
 
     if (_uart)

@@ -9,6 +9,7 @@
 #include "gatt_server_process.h"
 #include "SmartPPEService.h"
 #include "Logger.h"
+#include "FRAM.h"
 
 using namespace std::chrono;
 
@@ -20,8 +21,7 @@ public:
 
     enum MASK_STATE_t
     {
-        OFF_FACE_INACTIVE,
-        OFF_FACE_ACTIVE,
+        OFF_FACE,
         ON_FACE,
         MASK_STATE_LAST
     };
@@ -43,12 +43,15 @@ public:
     };
 
     void run();
-    void update_state(uint32_t ts);
+    void update_state();
 private:
     SPI _spi;
     I2C _i2c;
     BusControl* _bus_control;
     Logger* _logger;
+    // FRAM _fram;
+    LowPowerTimer _state_timer;
+
 
     SmartPPEService* _smart_ppe_ble;
     static Thread _ble_thread;
@@ -61,15 +64,15 @@ private:
 
     struct FaceBitData
     {
-        FACEBIT_DATA_TYPES_t data_type;
         uint64_t timestamp;
+        FACEBIT_DATA_TYPES_t data_type;
         uint8_t value;
     };
 
     vector<FaceBitData> data_buffer;
 
     MASK_STATE_t _mask_state = MASK_STATE_LAST;
-    MASK_STATE_t _next_mask_state = OFF_FACE_INACTIVE;
+    MASK_STATE_t _next_mask_state = OFF_FACE;
     bool _new_mask_state = true;
 
     TASK_STATE_t _task_state = IDLE;
@@ -78,20 +81,15 @@ private:
 
     milliseconds _sleep_duration = 1000ms;
 
-    milliseconds INACTIVE_SLEEP_DURATION = 10000ms;
-    milliseconds ACTIVE_SLEEP_DURATION = 5000ms;
-    uint32_t ACTIVE_STATE_TIMEOUT = 30000;
-    milliseconds ON_FACE_SLEEP_DURATION = 1000ms;
+    milliseconds OFF_SLEEP_DURATION = 5000ms;
+    milliseconds ON_FACE_SLEEP_DURATION = 5000ms;
 
-    const uint32_t RR_PERIOD = 10000;// * 60 * 1000; // 5 min
-    const uint32_t HR_PERIOD = 10000;//1 * 60 * 1000; // 1 min
-    // const uint32_t MASK_FIT_PERIOD = 5000;//1 * 60 * 1000; // 1 min
-    const uint32_t BLE_BROADCAST_PERIOD = 60000;//5 * 60 * 1000; // 5 min
+    const uint32_t RR_PERIOD = 0 * 10 * 1000; // 1 min
+    const uint32_t HR_PERIOD = 0 * 40 * 1000; // 1 min
+    const uint32_t BLE_BROADCAST_PERIOD = 2 * 60 * 1000; // 2 min
 
     const uint32_t BLE_CONNECTION_TIMEOUT = 5000;
     const uint32_t BLE_DRDY_TIMEOUT = 5000;
-
-    uint32_t ACTIVE_STATE_ENTRY_TS = 0;
 
     uint64_t _mask_state_change_ts = 0; 
 
@@ -100,10 +98,23 @@ private:
     uint32_t _last_mf_ts = 0;
     uint32_t _last_ble_ts = 0;
 
+    const uint8_t RESP_RATE_FAILURE = 1;
+    const uint8_t HR_FAILURE = 1;
+
     bool _ble_initialized = false;
 
+    const uint8_t BUFFER_SIZE_ADDR = 10;
+    const uint8_t CURRENT_TIME_ADDR = 12;
+    const uint8_t DATA_BUFFER_ADDR = 20;
+    const uint8_t INITIALIZE_ADDR = 1;
+    const char INITIALIZE_STR[4] = {0xAB, 0xAF, 0xFA, 0xAA};
+
     bool _get_imu_int();
-    bool _sync_data(GattServerProcess *_ble_process);
+    bool _sync_data();
+    // bool _store_data_buffer();
+    // uint64_t _retrieve_time();
+    // bool _store_time();
+    // bool _initialize_fram();
 };
 
 
