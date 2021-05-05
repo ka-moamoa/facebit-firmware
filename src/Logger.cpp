@@ -72,6 +72,6 @@ void Logger::log(trace_level_t level, const char *msg, ...)
     }
     else
     {
-        _swo->printf("[%c] // %s\r\n", _trace_char[level], buffer);
+        _swo->printf("%s\r\n", buffer);
     }
 }

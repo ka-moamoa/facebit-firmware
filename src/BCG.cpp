@@ -3,7 +3,7 @@
 #include "Utilites.h"
 #include <numeric>
 
-// #define BCG_LOGGING
+#define BCG_LOGGING
 
 using namespace std::chrono;
 
@@ -88,13 +88,22 @@ bool BCG::bcg(const seconds num_seconds)
     LowPowerTimer zc_timer;
     zc_timer.start();
 
-    _logger->log(TRACE_INFO, "%s", "SENSING HR");
-
     #ifdef BCG_LOGGING
     {
         _logger->log(TRACE_WARNING, "ts, g_x, g_y, g_z, x_filt, y_filt, z_filt, l2norm, bcg");
     }
     #endif // BCG_LOGGING
+
+    uint8_t initial_samples = 0;
+    while (initial_samples < 5) // throw out the first five samples to let the internal filter equilibrate
+    {
+        if (_g_drdy.read())
+        {
+            float gyr[3] = {0};
+            imu.get_g_axes_f(gyr);
+            initial_samples++;
+        }
+    }
 
     // acquire and process samples until num_seconds has elapsed
     while(zc_timer.elapsed_time() <= duration_cast<microseconds>(num_seconds))
@@ -142,13 +151,9 @@ bool BCG::bcg(const seconds num_seconds)
             // send l2norm through hr isolation filter
             float next_bcg_val = hr_isolation.step(mag);
 
-            #ifdef BCG_LOGGING
-            {
-                _logger->log(TRACE_WARNING, "%i, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f", zc_timer.read_ms(), x, y, z, xfilt, yfilt, zfilt, mag, next_bcg_val);
-            }
-            #endif // BCG_LOGGING
-
             // look for a descending zero-cross
+            float rate_raw = 0;
+            float std_dev = 0;
             if (last_bcg_val > 0 && next_bcg_val <= 0)
             {
                 double zc_ts = (double)zc_timer.read();
@@ -169,11 +174,11 @@ bool BCG::bcg(const seconds num_seconds)
 
                     Utilities::reciprocal(crosses_copy); // get element-wise frequency
                     Utilities::multiply(crosses_copy, 60.0); // get element-wise heart rate
-                    float std_dev = Utilities::std_dev(crosses_copy); // calculate standard deviation across the heart rates
+                    std_dev = Utilities::std_dev(crosses_copy); // calculate standard deviation across the heart rates
                     
                     if (std_dev < STD_DEV_THRESHOLD) // we have some stable readings! calculate heart rate
                     {
-                        float rate_raw = Utilities::mean(crosses_copy);
+                        rate_raw = Utilities::mean(crosses_copy);
 
                         // bounds checking
                         if (rate_raw >= MIN_HR && rate_raw <= MAX_HR)
@@ -190,6 +195,13 @@ bool BCG::bcg(const seconds num_seconds)
                     }
                 }
             }
+
+            #ifdef BCG_LOGGING
+            {
+                _logger->log(TRACE_WARNING, "%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f", x, y, z, xfilt, yfilt, zfilt, mag, next_bcg_val, rate_raw, std_dev);
+            }
+            #endif // BCG_LOGGING
+
 
             last_bcg_val = next_bcg_val;
         }
