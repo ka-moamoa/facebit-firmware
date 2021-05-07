@@ -11,9 +11,9 @@
 #include "CapCalc.h"
 #include "FaceBitState.hpp"
 
-// #define FACEBIT_UART
-#define FACEBIT_SWO
-#define TRACE_LEVEL TRACE_TRACE
+#define FACEBIT_UART
+// #define FACEBIT_SWO
+#define TRACE_LEVEL TRACE_INFO
 
 // #include "mbed_mem_trace.h"
 
