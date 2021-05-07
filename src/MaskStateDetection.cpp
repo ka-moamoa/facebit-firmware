@@ -22,7 +22,7 @@ MaskStateDetection::MASK_STATE_t MaskStateDetection::is_on()
     
     ThisThread::sleep_for(10ms);
 
-    if (!_barometer->initialize() || !_barometer->set_fifo_full_interrupt(true) || !_barometer->set_frequency(10))
+    if (!_barometer->initialize() || !_barometer->set_fifo_full_interrupt(true) || !_barometer->set_frequency(1))
     {
         _logger->log(TRACE_WARNING, "%s", "barometer failed to initialize");
         return ERROR;
