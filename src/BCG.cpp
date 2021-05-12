@@ -3,7 +3,7 @@
 #include "Utilites.h"
 #include <numeric>
 
-#define BCG_LOGGING
+// #define BCG_LOGGING
 
 using namespace std::chrono;
 
@@ -80,8 +80,12 @@ bool BCG::bcg(const seconds num_seconds)
     float last_bcg_val = -1.0;
     vector<double> last_crosses;
     vector<double> rates;
+    vector<double> last_maxes;
+    vector<double> last_mins;
     bool new_hr_reading = false;
     bool initialized = false;
+    float max = 0;
+    float min = 0;
 
     LowPowerTimer timeout;
     timeout.start();
@@ -156,8 +160,14 @@ bool BCG::bcg(const seconds num_seconds)
             float std_dev = 0;
             if (last_bcg_val > 0 && next_bcg_val <= 0)
             {
+
                 double zc_ts = (double)zc_timer.read();
                 last_crosses.push_back(zc_ts);
+                last_maxes.push_back(max);
+                last_mins.push_back(min);
+
+                max = 0;
+                min = 0;
 
                 if (last_crosses.size() >= NUM_EVENTS)
                 {
@@ -192,6 +202,8 @@ bool BCG::bcg(const seconds num_seconds)
                     while(last_crosses.size() >= NUM_EVENTS)
                     {
                         last_crosses.erase(last_crosses.begin());
+                        last_maxes.erase(last_maxes.begin());
+                        last_mins.erase(last_mins.begin());
                     }
                 }
             }

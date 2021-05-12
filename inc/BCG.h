@@ -50,7 +50,7 @@ private:
      * STD_DEV_THRESHOLD before we calculate 
      * a heart rate based on them.
      */
-    uint8_t NUM_EVENTS = 5; // number of sequential events
+    uint8_t NUM_EVENTS = 6; // number of sequential events
     const float STD_DEV_THRESHOLD = 20.0; // in BPM
     const float OUTLIER_THRESHOLD = 3.0; // standard deviations
 
