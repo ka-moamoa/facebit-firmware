@@ -48,17 +48,17 @@ public:
             printf("Allocation of temperature characteristic failed\r\n");
         }
 
-        _respiratory_rate = new ReadOnlyArrayGattCharacteristic<uint8_t, 9> (rr_uuid, &_initial_value_uint8_t);
+        _respiratory_rate = new ReadOnlyArrayGattCharacteristic<uint8_t, 10> (rr_uuid, &_initial_value_uint8_t);
         if (!_respiratory_rate) {
             printf("Allocation of magnetometer characteristic failed\r\n");
         }
 
-        _bcg = new ReadOnlyArrayGattCharacteristic<uint8_t, 9> (bcg_uuid, &_initial_value_uint8_t);
+        _bcg = new ReadOnlyArrayGattCharacteristic<uint8_t, 10> (bcg_uuid, &_initial_value_uint8_t);
         if (!_bcg) {
             printf("Allocation of imu characteristic failed\r\n");
         }
 
-        _mask_on = new ReadOnlyArrayGattCharacteristic<uint8_t, 9> (on_uuid, &_initial_value_uint8_t);
+        _mask_on = new ReadOnlyArrayGattCharacteristic<uint8_t, 10> (on_uuid, &_initial_value_uint8_t);
         if (!_mask_on) {
             printf("Allocation of mic characteristic failed\r\n");
         }
@@ -151,40 +151,40 @@ public:
         _server->write(_temperature->getValueHandle(), bytearray, (size * 2) + 13);
     }
 
-    void updateRespiratoryRate(uint64_t data_timestamp, uint8_t respiratory_rate)
+    void updateRespiratoryRate(uint64_t data_timestamp, uint16_t respiratory_rate)
     {
-        uint8_t bytearray[9] = {0};
+        uint8_t bytearray[10] = {0};
         uint64_t timestamp = data_timestamp;
         std::memcpy(bytearray, &timestamp, 8);
 
-        uint8_t rr = respiratory_rate;
-        std::memcpy(&bytearray[8], &rr, 1);
+        uint16_t value = respiratory_rate;
+        std::memcpy(&bytearray[8], &value, 2);
 
-        _server->write(_respiratory_rate->getValueHandle(), bytearray, 9);
+        _server->write(_respiratory_rate->getValueHandle(), bytearray, 10);
     }
 
-    void updateHeartRate(uint64_t data_timestamp, uint8_t heart_rate)
+    void updateHeartRate(uint64_t data_timestamp, uint16_t heart_rate)
     {
-        uint8_t bytearray[9] = {0};
+        uint8_t bytearray[10] = {0};
         uint64_t timestamp = data_timestamp;
         std::memcpy(bytearray, &timestamp, 8);
 
-        uint8_t hr = heart_rate;
-        std::memcpy(&bytearray[8], &hr, 1);
+        uint16_t value = heart_rate;
+        std::memcpy(&bytearray[8], &value, 2);
 
-        _server->write(_bcg->getValueHandle(), bytearray, 9);
+        _server->write(_bcg->getValueHandle(), bytearray, 10);
     }
 
-    void updateMaskOn(uint64_t data_timestamp, uint8_t mask_on)
+    void updateMaskOn(uint64_t data_timestamp, uint16_t mask_on)
     {
-        uint8_t bytearray[9] = {0};
+        uint8_t bytearray[10] = {0};
         uint64_t timestamp = data_timestamp;
         std::memcpy(bytearray, &timestamp, 8);
 
-        uint8_t on = mask_on;
-        std::memcpy(&bytearray[8], &on, 1);
+        uint16_t value = mask_on;
+        std::memcpy(&bytearray[8], &value, 2);
 
-        _server->write(_mask_on->getValueHandle(), bytearray, 9);
+        _server->write(_mask_on->getValueHandle(), bytearray, 10);
     }
 
     void updateDataReady(data_ready_t type)
@@ -229,9 +229,9 @@ private:
 
     ReadOnlyArrayGattCharacteristic<uint8_t, 213>* _pressure = nullptr;
     ReadOnlyArrayGattCharacteristic<uint8_t, 213>* _temperature = nullptr;
-    ReadOnlyArrayGattCharacteristic<uint8_t, 9>* _respiratory_rate = nullptr;
-    ReadOnlyArrayGattCharacteristic<uint8_t, 9>* _bcg = nullptr;
-    ReadOnlyArrayGattCharacteristic<uint8_t, 9>* _mask_on = nullptr;
+    ReadOnlyArrayGattCharacteristic<uint8_t, 10>* _respiratory_rate = nullptr;
+    ReadOnlyArrayGattCharacteristic<uint8_t, 10>* _bcg = nullptr;
+    ReadOnlyArrayGattCharacteristic<uint8_t, 10>* _mask_on = nullptr;
     ReadWriteGattCharacteristic<uint8_t>* _data_ready = nullptr;
     ReadWriteGattCharacteristic<uint64_t>* _time = nullptr;
 
