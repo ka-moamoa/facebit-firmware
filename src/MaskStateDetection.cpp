@@ -1,5 +1,6 @@
 #include "MaskStateDetection.hpp"
 #include "BusControl.h"
+#include "../iir-filter-kit/BiQuad.h"
 
 MaskStateDetection::MaskStateDetection(Barometer* barometer)
 {
@@ -13,6 +14,8 @@ MaskStateDetection::~MaskStateDetection()
 
 MaskStateDetection::MASK_STATE_t MaskStateDetection::is_on()
 {
+    MASK_STATE_t mask_state = OFF;
+
     _logger->log(TRACE_INFO, "%s", "CHECKING MASK ON");
 
     BusControl* _bus_control = BusControl::get_instance();
@@ -22,7 +25,20 @@ MaskStateDetection::MASK_STATE_t MaskStateDetection::is_on()
     
     ThisThread::sleep_for(10ms);
 
-    if (!_barometer->initialize() || !_barometer->set_fifo_full_interrupt(true) || !_barometer->set_frequency(1))
+    /**
+     * @brief Init 2nd order bandpass (1/15-1 Hz) Butterworth filter
+     * 
+     * Documentation can be found in BiQuad.h. BiQuads were 
+     * generated with filter-designer.py assuming 10 Hz sampling frequency.
+     */
+
+    BiQuadChain bpf;
+	BiQuad bq1( 0.06004382,  0.12008764,  0.06004382,  1.,         -1.21246615,  0.46367415);
+ 	BiQuad bq2( 1.,         -2.,          1.,          1.,         -1.94162756,  0.94354483);
+
+	bpf.add( &bq1 ).add( &bq2 );
+
+    if (!_barometer->initialize() || !_barometer->set_fifo_full_interrupt(true) || !_barometer->set_frequency(SAMPLING_FREQUENCY))
     {
         _logger->log(TRACE_WARNING, "%s", "barometer failed to initialize");
         return ERROR;
@@ -43,25 +59,39 @@ MaskStateDetection::MASK_STATE_t MaskStateDetection::is_on()
         {
             uint16_t* pressure_buffer = _barometer->get_pressure_array();
 
-            uint16_t min = 65535;
-            uint16_t max = 0;
-            for (int i = 0; i < _barometer->get_pressure_buffer_size(); i++)
+            for (int i = 0; i < SAMPLING_FREQUENCY * 200; i++)
             {
-                uint16_t val = pressure_buffer[i];
-
-                if (val < min) min = val;
-                else if (val > max) max = val;
+                bpf.step(pressure_buffer[1]); // prime filter with initial value
             }
-            
-            uint16_t diff = abs(max - min);
-            _logger->log(TRACE_TRACE, "max/min diff = %u", diff);
+
+            float peak_max = 0;
+            float trough_min = 4294967295;
+            uint32_t last_zc = 0;
+            float last_filtered_pressure = -1;
+            for (int i = 1; i < _barometer->get_pressure_buffer_size(); i++)
+            {
+                float filtered_pressure = bpf.step(pressure_buffer[i]);
+
+                if (filtered_pressure < trough_min) trough_min = filtered_pressure;
+                else if (filtered_pressure > peak_max) peak_max = filtered_pressure;
+
+                if (filtered_pressure < 0 && last_filtered_pressure > 0)
+                {
+                    if (peak_max > ON_THRESHOLD && trough_min < (-1 * ON_THRESHOLD) && last_zc != 0 && i - last_zc > SAMPLING_FREQUENCY * 2)
+                    {
+                        _logger->log(TRACE_DEBUG, "breath detected! mask on. peak max = %0.2f, peak min = %0.2f\n", peak_max, trough_min);
+                        mask_state = ON;
+                    }
+                    last_zc = i;
+                }
+                last_filtered_pressure = filtered_pressure;
+            }
 
             _barometer->clear_buffers();
 
             _bus_control->spi_power(false);
 
-            if (diff > ON_THRESHOLD) return ON;
-            else return OFF;
+            return mask_state;
         }
     }
 

@@ -22,8 +22,9 @@ private:
     Barometer* _barometer;
     Logger* _logger;
 
-    const float DETECTION_WINDOW = 5.0;
-    const uint16_t ON_THRESHOLD = 15; // 0.15 mbar, this from https://gitlab.com/ka-moamoa/smart-ppe/facebit-companion-ios/-/blob/master/data-exploration/mask-on-off.ipynb
+    const float DETECTION_WINDOW = 10.0; // seconds
+    const int SAMPLING_FREQUENCY = 10; // hz
+    const uint16_t ON_THRESHOLD = 10; // 0.15 mbar, this from https://gitlab.com/ka-moamoa/smart-ppe/facebit-companion-ios/-/blob/master/data-exploration/mask-on-off.ipynb
 };
 
 
