@@ -34,6 +34,7 @@ MaskStateDetection::MASK_STATE_t MaskStateDetection::is_on()
     while(timer.read() < DETECTION_WINDOW + 5) // timeout so we don't get stuck
     {
         uint32_t sleep_time = std::min((int)(32.0 / (float)_barometer->get_frequency() * 1000.0 + 10.0), (int)((DETECTION_WINDOW * 1000.0) - timer.read_ms() + 10));
+        _logger->log(TRACE_DEBUG, "sleep time = %lu", sleep_time);
         ThisThread::sleep_for(sleep_time);
 
         _barometer->update(true);
