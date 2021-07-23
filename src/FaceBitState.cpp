@@ -60,30 +60,30 @@ void FaceBitState::update_state()
     {
         case OFF_FACE:
         {
-            // if (_new_mask_state)
-            // {
-            //     _sleep_duration = OFF_SLEEP_DURATION;
-            // }
+            if (_new_mask_state)
+            {
+                _sleep_duration = OFF_SLEEP_DURATION;
+            }
 
-            // Barometer barometer(&_spi, (PinName)BAR_CS, (PinName)BAR_DRDY);
-            // MaskStateDetection mask_state(&barometer);
+            Barometer barometer(&_spi, (PinName)BAR_CS, (PinName)BAR_DRDY);
+            MaskStateDetection mask_state(&barometer);
 
-            // MaskStateDetection::MASK_STATE_t mask_status;
-            // mask_status = mask_state.is_on(); // blocking call for ~5s
+            MaskStateDetection::MASK_STATE_t mask_status;
+            mask_status = mask_state.is_on(); // blocking call for ~5s
 
-            // if (mask_status == MaskStateDetection::ON)
-            // {
-            //     _logger->log(TRACE_INFO, "%s", "MASK ON");
+            if (mask_status == MaskStateDetection::ON)
+            {
+                _logger->log(TRACE_INFO, "%s", "MASK ON");
             _next_mask_state = ON_FACE;
-            // }
-            // else if (mask_status == MaskStateDetection::OFF)
-            // {
-            //     _logger->log(TRACE_INFO, "%s", "MASK OFF");
-            // }
-            // else if (mask_status == MaskStateDetection::ERROR)
-            // {
-            //     _logger->log(TRACE_WARNING, "%s", "MASK DETECTION ERROR");
-            // }
+            }
+            else if (mask_status == MaskStateDetection::OFF)
+            {
+                _logger->log(TRACE_INFO, "%s", "MASK OFF");
+            }
+            else if (mask_status == MaskStateDetection::ERROR)
+            {
+                _logger->log(TRACE_WARNING, "%s", "MASK DETECTION ERROR");
+            }
 
             break;
         }
@@ -95,19 +95,17 @@ void FaceBitState::update_state()
             {
                 case IDLE:
                 {
-                    // uint32_t rr_time_over = _state_timer.read_ms() - _last_rr_ts;
-                    // uint32_t hr_time_over = _state_timer.read_ms() - _last_hr_ts;
+                    uint32_t rr_time_over = _state_timer.read_ms() - _last_rr_ts;
+                    uint32_t hr_time_over = _state_timer.read_ms() - _last_hr_ts;
 
-                    // if (_state_timer.read_ms() - _last_rr_ts >= RR_PERIOD && (rr_time_over >= hr_time_over))
-                    // {
-                    //     _next_task_state = MEASURE_RESPIRATION_RATE;
-                    // }
-                    // else if (_state_timer.read_ms() - _last_hr_ts >= HR_PERIOD && (hr_time_over >= rr_time_over))
-                    // {
-                    //     _next_task_state = MEASURE_HEART_RATE;
-                    // }
-
-                    _next_task_state = MEASURE_HEART_RATE;
+                    if (_state_timer.read_ms() - _last_rr_ts >= RR_PERIOD && (rr_time_over >= hr_time_over))
+                    {
+                        _next_task_state = MEASURE_RESPIRATION_RATE;
+                    }
+                    else if (_state_timer.read_ms() - _last_hr_ts >= HR_PERIOD && (hr_time_over >= rr_time_over))
+                    {
+                        _next_task_state = MEASURE_HEART_RATE;
+                    }
 
                     break;
                 }
@@ -159,7 +157,7 @@ void FaceBitState::update_state()
                     _last_hr_ts = _state_timer.read_ms();
                     BCG bcg(&_spi, (PinName)IMU_INT1, (PinName)IMU_CS);
 
-                    if(bcg.bcg(100s)) // blocking
+                    if(bcg.bcg(10s)) // blocking
                     {
                         _logger->log(TRACE_DEBUG, "%s", "HR CAPTURED!");
                         for(int i = 0; i < bcg.get_buffer_size(); i++)
@@ -214,27 +212,27 @@ void FaceBitState::update_state()
              * new task, so we don't waste energy on the task (and get
              * an inaccurate result) if the mask is off.
              */
-            // Barometer barometer(&_spi, (PinName)BAR_CS, (PinName)BAR_DRDY);
-            // MaskStateDetection mask_state(&barometer);
+            Barometer barometer(&_spi, (PinName)BAR_CS, (PinName)BAR_DRDY);
+            MaskStateDetection mask_state(&barometer);
 
-            // MaskStateDetection::MASK_STATE_t mask_status;
-            // mask_status = mask_state.is_on(); // blocking call for ~5s
+            MaskStateDetection::MASK_STATE_t mask_status;
+            mask_status = mask_state.is_on(); // blocking call for ~5s
 
-            // if (mask_status == MaskStateDetection::ON)
-            // {
-                // _logger->log(TRACE_INFO, "%s", "MASK ON");
-            // }
-            // else if (mask_status == MaskStateDetection::OFF)
-            // {
-            //     _logger->log(TRACE_INFO, "%s", "MASK OFF");
-            //     _next_task_state = IDLE;
-            //     _next_mask_state = OFF_FACE;
-            // }
-            // else if (mask_status == MaskStateDetection::ERROR)
-            // {
-            //     _logger->log(TRACE_WARNING, "%s", "MASK DETECTION ERROR");
-            //     _next_task_state = IDLE; // don't run if we don't know
-            // }
+            if (mask_status == MaskStateDetection::ON)
+            {
+                _logger->log(TRACE_INFO, "%s", "MASK ON");
+            }
+            else if (mask_status == MaskStateDetection::OFF)
+            {
+                _logger->log(TRACE_INFO, "%s", "MASK OFF");
+                _next_task_state = IDLE;
+                _next_mask_state = OFF_FACE;
+            }
+            else if (mask_status == MaskStateDetection::ERROR)
+            {
+                _logger->log(TRACE_WARNING, "%s", "MASK DETECTION ERROR");
+                _next_task_state = IDLE; // don't run if we don't know
+            }
         }
 
         _new_task_state = true;
