@@ -82,6 +82,10 @@ MaskStateDetection::MASK_STATE_t MaskStateDetection::is_on()
                         _logger->log(TRACE_DEBUG, "breath detected! mask on. peak max = %0.2f, peak min = %0.2f\n", peak_max, trough_min);
                         mask_state = ON;
                     }
+                    else
+                    {
+                        _logger->log(TRACE_DEBUG, "breath NOT detected! mask on. peak max = %0.2f, peak min = %0.2f\n", peak_max, trough_min);
+                    }
                     last_zc = i;
                 }
                 last_filtered_pressure = filtered_pressure;
