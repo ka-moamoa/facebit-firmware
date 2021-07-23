@@ -74,7 +74,7 @@ void FaceBitState::update_state()
             if (mask_status == MaskStateDetection::ON)
             {
                 _logger->log(TRACE_INFO, "%s", "MASK ON");
-            _next_mask_state = ON_FACE;
+                _next_mask_state = ON_FACE;
             }
             else if (mask_status == MaskStateDetection::OFF)
             {

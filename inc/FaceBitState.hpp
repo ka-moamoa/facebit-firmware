@@ -66,7 +66,7 @@ private:
     {
         uint64_t timestamp;
         FACEBIT_DATA_TYPES_t data_type;
-        uint8_t value;
+        uint16_t value;
     };
 
     vector<FaceBitData> data_buffer;

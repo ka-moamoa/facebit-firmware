@@ -54,15 +54,15 @@ float RespiratoryRate::respiratory_rate(const uint8_t num_seconds, RespSource_t 
 	}
 
     /**
-     * @brief Init 2nd order bandpass (1/15-0.5 Hz) Butterworth filter
+     * @brief Init 2nd order bandpass (1/15-1 Hz) Butterworth filter
      * 
      * Documentation can be found in BiQuad.h. BiQuads were 
      * generated with filter-designer.py assuming 10 Hz sampling frequency.
      */
 
     BiQuadChain bpf;
-	BiQuad bq1( 0.0154759, 0.03095179, 0.0154759, 1., -1.64951809, 0.7183872 );
-	BiQuad bq2( 1., -2., 1., 1., -1.94510068, 0.9471958 );
+	BiQuad bq1( 0.06004382,  0.12008764,  0.06004382,  1.,         -1.21246615,  0.46367415);
+ 	BiQuad bq2( 1.,         -2.,          1.,          1.,         -1.94162756,  0.94354483);
 
 	bpf.add( &bq1 ).add( &bq2 );
 
@@ -185,7 +185,7 @@ float RespiratoryRate::respiratory_rate(const uint8_t num_seconds, RespSource_t 
 	{
 		// turn off I2C bus
 		_temp.stop();
-		// _bus_control->i2c_power(false); // turning off the bus actually results in _higher_ current consumption than leaving it on
+		// _bus_control->i2c_power(false); // commented out because turning off the bus actually results in _higher_ current consumption than leaving it on
 	}
 
 	// now calculate resp rate from the zero-crosses we've detected
@@ -204,7 +204,7 @@ float RespiratoryRate::respiratory_rate(const uint8_t num_seconds, RespSource_t 
 	for (int i = 0; i < zc_ts.size(); i++)
 	{
 		_logger->log(TRACE_TRACE, "rr[%i] = %0.1f", zc_ts[i]);
-		if (zc_ts[i] < 4 || zc_ts[i] > 30) // these resp rates are out-of bounds for our filtering (and physiologically unlikely)
+		if (zc_ts[i] < 4 || zc_ts[i] > 60) // these resp rates are out-of bounds for our filtering (and physiologically unlikely)
 		{
 			_logger->log(TRACE_DEBUG, "Deleting resp rate element %i: %0.1f breaths/min", zc_ts[i]);
 			zc_ts.erase(zc_ts.begin() + i); 
@@ -223,7 +223,7 @@ float RespiratoryRate::respiratory_rate(const uint8_t num_seconds, RespSource_t 
 		_logger->log(TRACE_INFO, "Respiration rate = %0.1f, std dev = %0.1f", resp_rate, std_dev);
 	}
 	
-	if (resp_rate < 4 || resp_rate > 30) // filter not designed to detect RR outside these limits
+	if (resp_rate < 4 || resp_rate > 60) // filter not designed to detect RR outside these limits
 	{
 		resp_rate = -1; 
 	}
