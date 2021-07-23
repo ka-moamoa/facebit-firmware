@@ -129,7 +129,7 @@ void FaceBitState::update_state()
                         rr_data.timestamp = Utilities::round(_state_timer.read());
                         rr_data.value = Utilities::round(rate * 10);
 
-                        _logger->log(TRACE_INFO, "RR ts: %llu, value: %u", rr_data.timestamp, rate);
+                        _logger->log(TRACE_INFO, "RR ts: %llu, value: %lu", rr_data.timestamp, rate);
 
                         data_buffer.push_back(rr_data);
                     }
@@ -157,7 +157,7 @@ void FaceBitState::update_state()
                     _last_hr_ts = _state_timer.read_ms();
                     BCG bcg(&_spi, (PinName)IMU_INT1, (PinName)IMU_CS);
 
-                    if(bcg.bcg(10s)) // blocking
+                    if(bcg.bcg(15s)) // blocking
                     {
                         _logger->log(TRACE_DEBUG, "%s", "HR CAPTURED!");
                         for(int i = 0; i < bcg.get_buffer_size(); i++)

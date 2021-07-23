@@ -84,8 +84,8 @@ private:
     milliseconds OFF_SLEEP_DURATION = 5000ms;
     milliseconds ON_FACE_SLEEP_DURATION = 5000ms;
 
-    const uint32_t RR_PERIOD = 0 * 10 * 1000; // 1 min
-    const uint32_t HR_PERIOD = 0 * 40 * 1000; // 1 min
+    const uint32_t RR_PERIOD = 1000; // 1 second
+    const uint32_t HR_PERIOD = 1000; // 1 second
     const uint32_t BLE_BROADCAST_PERIOD = 2 * 60 * 1000; // 2 min
 
     const uint32_t BLE_CONNECTION_TIMEOUT = 5000;
